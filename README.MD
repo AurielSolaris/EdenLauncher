@@ -1,0 +1,145 @@
+<img src="art/eden-icon.svg" alt="Eden icon" width="96" align="left" hspace="12" vspace="4">
+
+# Eden
+
+A revival of the classic **AOSP Launcher3**, rewritten in Kotlin, for people who are tired of being
+told how their own home screen works.
+
+<br clear="left">
+
+
+Somewhere between Android 7 and now, launchers stopped asking. The grid is the grid. The drawer
+scrolls the way it scrolls. Your home page is the leftmost one, because it just is. Empty screens
+get deleted out from under you, because surely you did not mean to have one. Every OEM ships its
+own idea of correct, buries the settings somewhere different, and half the time removes them.
+
+Eden gives that back. Every one of those is a setting, and the defaults are only defaults.
+
+---
+
+## What it does
+
+- **Home screen** with pages you control. Add one, delete one, or keep one deliberately empty
+  because you like seeing your wallpaper. Long-press to zoom out into overview and manage them as
+  cards, the way Launcher3 always did it.
+- **Pick your home page.** Keep the middle one as home and have pages either side of it. Tap the
+  little house on any card in overview. Stock Android has never let you do this without replacing
+  the whole launcher; here it is one tap.
+- **An app drawer that works your way** - fling vertically through one continuous grid, or swipe
+  through fixed pages. Same apps, same search, your choice of gesture. Set the background anywhere
+  from fully opaque to fully transparent so your wallpaper shows through.
+- **Drag and drop** icons between pages and the dock, stack two icons to make a folder, drag to
+  Remove to get rid of one.
+- **Your grid, your icons.** Columns, rows, dock size, icon size, spacing, label gap - all
+  adjustable, all with an Auto that just works if you would rather not think about it.
+- **Its own settings screen**, because a launcher lifted out of AOSP has no host app to hang
+  preferences off, and no two OEM Settings apps agree on where they should live.
+
+Coming next: live wallpapers as a first-class feature, then widgets.
+
+---
+
+## Status
+
+| Phase | Scope | State |
+|-------|-------|-------|
+| **1** | Foundation - project, models, database, workspace, paging, drag layer | **Done** |
+| **2** | Core launcher - loader, drag & drop, app drawer, folders, page management | **Done** (widget hosting deferred) |
+| 3 | Live wallpaper - discovery, picker, parallax, dimensions | Next |
+| 4 | Polish - animations, drop targets, QSB, deep shortcut popups | Not started |
+
+Running on a Galaxy M31 (Android 16, API 36). Release APK is about 600 KB.
+
+---
+
+## Build it
+
+| | |
+|---|---|
+| JDK | 17+ (built against Temurin 25) |
+| Android SDK | platform 36, build-tools 36+ |
+| Gradle | via the wrapper - do not install Gradle separately |
+| Device | Android 10 (API 29) and up |
+
+Put your SDK path in `local.properties` (`sdk.dir=...`; it is gitignored), then:
+
+```sh
+./gradlew assembleDebug          # debug APK  -> app/build/outputs/apk/debug/
+./gradlew assembleRelease        # minified   -> app/build/outputs/apk/release/
+./gradlew installDebug           # push to a connected device
+./gradlew lintDebug              # static analysis
+```
+
+On Windows use `gradlew.bat`. Release builds are signed with a throwaway key if
+`keystore.properties` and `keystore/eden-temp.jks` exist, and stay unsigned if they do not, so a
+fresh clone always builds.
+
+The whole toolchain is Kotlin, the Gradle wrapper, and the wrapper's own `sh` / `.bat` scripts. No
+Groovy, no Python, no Java sources.
+
+---
+
+## The rules this project follows
+
+Not preferences. Rules.
+
+1. **Target the low end.** Assume a 2-core, 4 GB phone. No allocation in touch handling, layout, or
+   draw. Reuse scratch buffers. A row of page dots is a `Canvas` call, not five views.
+2. **Every dependency has to earn its place.** The list is: `core-ktx`, `recyclerview`,
+   `kotlinx-coroutines`, and Room. No AppCompat, no Material, no `lifecycle-ktx` - that last one
+   was dropped for one hand-written `CoroutineScope`.
+3. **Modern APIs, not compatibility shims.** `minSdk 29` exists so the Nougat-era calls can be
+   replaced outright: coroutines over `AsyncTask`, `WindowInsets` over `fitSystemWindows`, Room
+   over `SQLiteOpenHelper` and a `ContentProvider`.
+4. **Never lose the user's arrangement.** The workspace database has no destructive-migration
+   fallback. Schema changes ship with a real `Migration`.
+5. **Stay readable against the original.** Class and resource names track AOSP Launcher3 so the
+   reference sources in `.ref/` stay searchable next to this code.
+
+---
+
+## Layout
+
+```
+Eden/
+|-- DOCS.MD                     How the pieces fit together
+|-- README.MD                   This file
+|-- LICENSE / NOTICE            MIT, plus Apache 2.0 for the ported parts
+|-- settings.gradle.kts         Modules and repositories
+|-- build.gradle.kts            Root build; plugins declared, not applied
+|-- gradle/libs.versions.toml   One place for every version
+|-- gradlew, gradlew.bat        Wrapper launchers
+|-- .ref/                       Pinned AOSP checkouts - gitignored, read-only, never compiled
+`-- app/src/main/
+    |-- AndroidManifest.xml
+    |-- res/                    Layouts, dimens, pastel green theme, adaptive icon
+    `-- kotlin/app/auriel/edenlauncher/
+        |-- Launcher.kt             Home activity; the only place a gesture becomes a database write
+        |-- LauncherModel.kt        Coroutine loader
+        |-- LauncherAppState.kt     Process-wide state
+        |-- PinItemRequestActivity  "Add to home screen" from other apps
+        |-- model/                  ItemInfo, ShortcutInfo, FolderInfo, AppInfo, widgets
+        |-- data/                   Room entities, DAO, database, repository
+        |-- device/                 Grid metrics
+        |-- views/                  PagedView, Workspace, CellLayout, DragLayer, Hotseat, overview
+        |-- dragndrop/              DragController and drop-target contracts
+        |-- folder/                 Folder and FolderIcon
+        |-- allapps/                The two drawer modes and their shared search
+        |-- settings/               Preferences and the settings screen
+        |-- widget/                 Placeholder until hosting lands
+        `-- util/                   Icon cache, user cache, bitmap helpers
+```
+
+---
+
+## Licence and origins
+
+Eden is MIT. Parts of it are ported from AOSP Launcher3, which is Apache 2.0 - those files say so
+in their header and are listed in `NOTICE`. `.ref/` holds unmodified AOSP checkouts (Android 7, 8,
+and 10) used for reading only; they are gitignored and never compiled.
+
+This is a rewrite, not a fork.
+
+---
+
+Bugs, ideas, disagreements: **debadityamalakar@gmail.com**

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        A launcher must be transparent so the wallpaper (and, in Phase 3, a live wallpaper) shows
+        through. windowShowWallpaper is what puts the wallpaper behind this window; the activity
+        also sets FLAG_SHOW_WALLPAPER so the state survives theme overrides.
+    -->
+    <style name="Theme.Eden" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+        <item name="android:windowShowWallpaper">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+    </style>
+
+    <!-- Ordinary opaque activity theme for the settings screen. -->
+    <style name="Theme.EdenSettings" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/settings_background</item>
+        <item name="android:statusBarColor">@color/settings_background</item>
+        <item name="android:navigationBarColor">@color/settings_background</item>
+        <item name="android:colorAccent">@color/accent</item>
+    </style>
+</resources>

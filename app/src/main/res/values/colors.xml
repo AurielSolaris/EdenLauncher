@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Eden palette: soft pastel greens on a deep, desaturated green-black.
+
+    Surfaces stay dark because everything in the launcher floats over the user's wallpaper, and a
+    pale panel would fight it. The pastels carry the identity: accents, the icon mark, and text.
+-->
+<resources>
+    <!-- Pastels -->
+    <color name="eden_mint">#A8E6C1</color>
+    <color name="eden_sage">#C7E9D2</color>
+    <color name="eden_leaf">#7FE7A5</color>
+    <color name="eden_moss">#5FBF88</color>
+    <color name="eden_deep">#1F7A4C</color>
+
+    <!-- Surfaces -->
+    <color name="eden_surface">#121A16</color>
+    <color name="eden_surface_raised">#1B241E</color>
+    <color name="eden_surface_scrim">#0E1611</color>
+
+    <!-- Roles -->
+    <color name="accent">@color/eden_leaf</color>
+    <color name="settings_background">@color/eden_surface</color>
+    <color name="settings_text">#EAF6EE</color>
+    <color name="settings_text_secondary">#A9C4B5</color>
+
+    <color name="ic_launcher_background">#10261B</color>
+
+    <color name="workspace_scrim">#66000000</color>
+    <color name="workspace_icon_text">#F2FBF6</color>
+    <color name="workspace_icon_text_shadow">#B3000000</color>
+
+    <color name="options_sheet_background">#F01B241E</color>
+    <color name="folder_background">#EB1B241E</color>
+    <color name="folder_preview_background">#A6C7E9D2</color>
+
+    <color name="all_apps_background">#0E1611</color>
+    <color name="all_apps_hint">#8CA9C4B5</color>
+
+    <color name="widget_placeholder_fill">#661B241E</color>
+
+    <color name="overview_card_fill">#591B241E</color>
+    <color name="overview_card_stroke">#66A8E6C1</color>
+    <color name="overview_badge_idle">#D9121A16</color>
+    <color name="overview_panel_background">#F0121A16</color>
+
+    <color name="drop_target_idle">#A0121A16</color>
+    <color name="drop_target_active">#DCE05A5A</color>
+</resources>

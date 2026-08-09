@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Eden</string>
+    <string name="home_screen">Home screen</string>
+    <string name="page_indicator_description">Page %1$d of %2$d</string>
+
+    <string name="all_apps_search_hint">Search apps</string>
+    <string name="all_apps_button_label">Apps</string>
+
+    <string name="folder_name">Folder</string>
+
+    <string name="remove_drop_target_label">Remove</string>
+
+    <string name="activity_not_found">App is not available</string>
+
+    <string name="pin_shortcut_added">Added to home screen</string>
+    <string name="pin_no_space">No room on the home screen</string>
+    <string name="pin_widget_unsupported">Widgets are not supported yet</string>
+    <string name="widget_placeholder">Widget (not hosted yet)</string>
+    <string name="last_page_kept">The last page cannot be removed</string>
+    <string name="home_page_set">This page is now your home page</string>
+
+    <string name="options_wallpaper">Wallpaper</string>
+
+    <string name="overview_add_page">Add page</string>
+    <string name="overview_wallpaper">Wallpaper</string>
+    <string name="overview_widgets">Widgets</string>
+    <string name="overview_settings">Settings</string>
+
+    <string name="settings_title">Eden settings</string>
+    <string name="settings_section_drawer">App drawer</string>
+    <string name="settings_drawer_mode">Navigation style</string>
+    <string name="settings_drawer_mode_vertical">Vertical scroll</string>
+    <string name="settings_drawer_mode_vertical_summary">Fling up and down through one continuous grid</string>
+    <string name="settings_drawer_mode_horizontal">Horizontal pages</string>
+    <string name="settings_drawer_mode_horizontal_summary">Swipe left and right between fixed grid pages</string>
+    <string name="settings_drawer_opacity">Background opacity</string>
+    <string name="settings_drawer_columns">Drawer columns</string>
+    <string name="settings_section_home">Home screen</string>
+    <string name="settings_grid_columns">Grid columns</string>
+    <string name="settings_grid_rows">Grid rows</string>
+    <string name="settings_grid_auto">Auto</string>
+    <string name="settings_hotseat_icons">Dock icons (bottom row)</string>
+    <string name="settings_section_icons">Icons</string>
+    <string name="settings_icon_size">Icon size</string>
+    <string name="settings_icon_padding_vertical">Vertical spacing</string>
+    <string name="settings_icon_padding_horizontal">Horizontal spacing</string>
+    <string name="settings_icon_label_spacing">Label gap</string>
+    <string name="settings_grid_restart_note">Grid changes apply when you return to the home screen.</string>
+</resources>

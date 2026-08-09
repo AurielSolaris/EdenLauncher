@@ -1,0 +1,35 @@
+# Reference sources (pinned AOSP Launcher3 checkouts, not part of the build)
+.ref/
+
+# Private roadmap. Timelines slip; the repo should not pretend otherwise.
+PLAN.MD
+
+# Gradle / Kotlin
+.gradle/
+.kotlin/
+build/
+local.properties
+
+# Android
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+captures/
+.cxx/
+output.json
+
+# IDE and local tooling
+.idea/
+.claude/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+
+# Keystores / secrets
+*.jks
+*.keystore
+keystore/
+keystore.properties

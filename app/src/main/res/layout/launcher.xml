@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Root of the launcher. The DragLayer is the coordinate space every drag is expressed in, so it
+    must be the outermost view; the workspace, dock, drop targets, and drawer are its siblings
+    rather than nested, exactly as in AOSP Launcher3.
+
+    Child order is drawing order: the drawer covers everything, and the delete bar sits above the
+    workspace so it can be dropped onto.
+-->
+<app.auriel.edenlauncher.views.DragLayer
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/drag_layer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
+    <app.auriel.edenlauncher.views.Workspace
+        android:id="@+id/workspace"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipChildren="false"
+        android:clipToPadding="false" />
+
+    <app.auriel.edenlauncher.views.PageIndicatorDots
+        android:id="@+id/page_indicator"
+        android:layout_width="wrap_content"
+        android:layout_height="@dimen/dynamic_grid_page_indicator_height"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="@dimen/dynamic_grid_hotseat_bar_height" />
+
+    <app.auriel.edenlauncher.views.Hotseat
+        android:id="@+id/hotseat"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/dynamic_grid_hotseat_bar_height"
+        android:layout_gravity="bottom" />
+
+    <app.auriel.edenlauncher.views.DeleteDropTarget
+        android:id="@+id/delete_drop_target"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/drop_target_bar_height"
+        android:layout_gravity="top" />
+
+    <app.auriel.edenlauncher.views.OverviewPanel
+        android:id="@+id/overview_panel"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/overview_panel_height"
+        android:layout_gravity="bottom" />
+
+    <app.auriel.edenlauncher.allapps.AllAppsContainerView
+        android:id="@+id/all_apps"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+</app.auriel.edenlauncher.views.DragLayer>
