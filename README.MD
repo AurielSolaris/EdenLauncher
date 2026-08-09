@@ -1,12 +1,7 @@
-<img src="art/eden-icon.svg" alt="Eden icon" width="96" align="left" hspace="12" vspace="4">
-
-# Eden
+<h1><img src="art/eden-icon.svg" alt="" width="40" align="middle">&nbsp; Eden</h1>
 
 A revival of the classic **AOSP Launcher3**, rewritten in Kotlin, for people who are tired of being
 told how their own home screen works.
-
-<br clear="left">
-
 
 Somewhere between Android 7 and now, launchers stopped asking. The grid is the grid. The drawer
 scrolls the way it scrolls. Your home page is the leftmost one, because it just is. Empty screens
@@ -138,7 +133,22 @@ Eden is MIT. Parts of it are ported from AOSP Launcher3, which is Apache 2.0 - t
 in their header and are listed in `NOTICE`. `.ref/` holds unmodified AOSP checkouts (Android 7, 8,
 and 10) used for reading only; they are gitignored and never compiled.
 
-This is a rewrite, not a fork.
+**Is it a fork or a rewrite?** Neither word is quite honest on its own, so: it is a **rewrite that
+is also a derivative work**.
+
+Not a fork in the usual sense - it shares no source files and no git history with Launcher3.
+Nothing was patched or carried over; every file here was written fresh in Kotlin, and the
+architecture diverges where it should (Room instead of a ContentProvider, coroutines instead of a
+loader thread, an interface between the views and the database).
+
+But it was written with the original open on the other monitor, and plenty came across: the class
+decomposition, the drag and drop protocol, the paging maths down to the exact fling thresholds and
+the velocity-scaled snap duration, the device profile table's numbers, the database column names.
+That is a derivative work, which is why Apache 2.0 still applies to those parts and why `NOTICE`
+names each file and the class it came from rather than waving at "inspired by AOSP".
+
+It is not clean-room either. Clean-room means one person reads and writes a spec and another
+implements from the spec alone. Nobody did that here.
 
 ---
 

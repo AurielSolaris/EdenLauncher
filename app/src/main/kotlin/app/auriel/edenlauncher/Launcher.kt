@@ -694,6 +694,10 @@ class Launcher : Activity(), ItemPlacementHandler {
             binding.workspace.isInOverview -> exitOverview()
             allApps.isOpen -> closeAllApps()
             openFolder != null -> closeFolder()
+
+            // Nothing is open, so back means "take me home" - the same page HOME returns to,
+            // which is not necessarily the leftmost one.
+            else -> binding.workspace.snapToPage(defaultPageIndex())
         }
     }
 
