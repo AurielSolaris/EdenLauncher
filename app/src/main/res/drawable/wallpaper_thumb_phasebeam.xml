@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Thumbnail shown in the system live wallpaper chooser.
+
+    A hand-drawn suggestion of the wallpaper rather than a captured frame: a bitmap screenshot
+    would be four PNGs at four densities, and it would go stale the moment the renderer changes.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="144dp"
+    android:viewportWidth="96"
+    android:viewportHeight="144">
+
+    <path
+        android:fillColor="#0E2C4A"
+        android:pathData="M0,0h96v144h-96z" />
+
+    <path
+        android:fillAlpha="0.55"
+        android:fillColor="#5AA6FF"
+        android:pathData="M22,30 L30,30 L26,74 L18,74 z" />
+    <path
+        android:fillAlpha="0.4"
+        android:fillColor="#8CC4FF"
+        android:pathData="M60,52 L70,52 L66,108 L56,108 z" />
+    <path
+        android:fillAlpha="0.35"
+        android:fillColor="#5AA6FF"
+        android:pathData="M42,84 L48,84 L45,126 L39,126 z" />
+
+    <path
+        android:fillColor="#CFE6FF"
+        android:pathData="M34,46m-3,0a3,3 0 1,0 6,0a3,3 0 1,0 -6,0" />
+    <path
+        android:fillAlpha="0.8"
+        android:fillColor="#CFE6FF"
+        android:pathData="M68,26m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+    <path
+        android:fillAlpha="0.7"
+        android:fillColor="#CFE6FF"
+        android:pathData="M20,104m-2.5,0a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0" />
+    <path
+        android:fillAlpha="0.6"
+        android:fillColor="#CFE6FF"
+        android:pathData="M74,90m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+</vector>

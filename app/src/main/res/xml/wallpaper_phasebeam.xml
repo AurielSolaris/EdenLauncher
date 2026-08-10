@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Metadata the system live wallpaper chooser reads. Every bundled wallpaper needs one of these
+    or it never appears in the system picker, only in Eden's.
+-->
+<wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
+    android:author="@string/wallpaper_author"
+    android:description="@string/wallpaper_phasebeam_summary"
+    android:thumbnail="@drawable/wallpaper_thumb_phasebeam" />

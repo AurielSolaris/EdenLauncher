@@ -112,6 +112,65 @@ class LauncherPrefs(context: Context) {
             .putInt(KEY_ICON_LABEL_SPACING, value.coerceIn(0, MAX_ICON_PADDING)).apply()
 
     /**
+     * Absolute path of the video imported for the video wallpaper, or null if there is none.
+     *
+     * A path rather than the original content URI: the source lives in another app's storage and
+     * can be moved, revoked, or deleted, and a wallpaper that stops working because a photo was
+     * tidied up is not acceptable. The transcoded copy is Eden's.
+     */
+    var videoWallpaperPath: String?
+        get() = prefs.getString(KEY_VIDEO_PATH, null)
+        set(value) = prefs.edit().putString(KEY_VIDEO_PATH, value).apply()
+
+    /**
+     * Whether the video wallpaper plays its sound.
+     *
+     * Off by default. The audio track is kept in the file either way, so this is a toggle rather
+     * than a reason to import the video again.
+     */
+    var videoWallpaperAudio: Boolean
+        get() = prefs.getBoolean(KEY_VIDEO_AUDIO, false)
+        set(value) = prefs.edit().putBoolean(KEY_VIDEO_AUDIO, value).apply()
+
+    /**
+     * How fast a bundled live wallpaper moves, as a multiplier.
+     *
+     * Stored as a percentage because that is what the slider deals in. 25% is a barely-moving
+     * scene, 200% is brisk. Slower is also cheaper: the frame rate does not change, but a scene
+     * you have slowed down is one you are less likely to turn off.
+     */
+    var liveWallpaperSpeed: Float
+        get() = prefs.getInt(KEY_WALLPAPER_SPEED, DEFAULT_WALLPAPER_SPEED)
+            .coerceIn(MIN_WALLPAPER_SPEED, MAX_WALLPAPER_SPEED) / 100f
+        set(value) = prefs.edit()
+            .putInt(
+                KEY_WALLPAPER_SPEED,
+                (value * 100f).toInt().coerceIn(MIN_WALLPAPER_SPEED, MAX_WALLPAPER_SPEED),
+            )
+            .apply()
+
+    /** The same value as the percentage the settings slider shows. */
+    var liveWallpaperSpeedPercent: Int
+        get() = prefs.getInt(KEY_WALLPAPER_SPEED, DEFAULT_WALLPAPER_SPEED)
+            .coerceIn(MIN_WALLPAPER_SPEED, MAX_WALLPAPER_SPEED)
+        set(value) = prefs.edit()
+            .putInt(KEY_WALLPAPER_SPEED, value.coerceIn(MIN_WALLPAPER_SPEED, MAX_WALLPAPER_SPEED))
+            .apply()
+
+    /**
+     * Whether the music visualiser reads the device's real audio output.
+     *
+     * Off by default, and that default is the point. On it needs `RECORD_AUDIO`, which lights the
+     * microphone indicator and reads, in the permission dialog, exactly like an app asking to
+     * listen to you - a lot to ask for a background. Off, the visualiser runs on an invented
+     * rhythm that needs no permission at all. Both are offered because which trade is acceptable
+     * is not Eden's call to make.
+     */
+    var visualizerUsesRealAudio: Boolean
+        get() = prefs.getBoolean(KEY_VISUALIZER_REAL_AUDIO, false)
+        set(value) = prefs.edit().putBoolean(KEY_VISUALIZER_REAL_AUDIO, value).apply()
+
+    /**
      * A token that changes whenever something requiring a full rebind changes.
      *
      * Cheaper and less error-prone than wiring a listener per setting: the launcher compares this
@@ -160,6 +219,10 @@ class LauncherPrefs(context: Context) {
         const val MAX_ICON_PERCENT = 140
         const val MAX_ICON_PADDING = 24
 
+        const val MIN_WALLPAPER_SPEED = 25
+        const val MAX_WALLPAPER_SPEED = 200
+        const val DEFAULT_WALLPAPER_SPEED = 100
+
         private const val FILE_NAME = "eden_prefs"
         private const val KEY_DRAWER_MODE = "app_drawer_mode"
         private const val KEY_DRAWER_OPACITY = "app_drawer_opacity"
@@ -173,6 +236,10 @@ class LauncherPrefs(context: Context) {
         private const val KEY_ICON_PAD_VERTICAL = "icon_padding_vertical"
         private const val KEY_ICON_PAD_HORIZONTAL = "icon_padding_horizontal"
         private const val KEY_ICON_LABEL_SPACING = "icon_label_spacing"
+        private const val KEY_VIDEO_PATH = "video_wallpaper_path"
+        private const val KEY_VIDEO_AUDIO = "video_wallpaper_audio"
+        private const val KEY_WALLPAPER_SPEED = "live_wallpaper_speed"
+        private const val KEY_VISUALIZER_REAL_AUDIO = "visualizer_real_audio"
 
         private const val DEFAULT_DRAWER_OPACITY = 92
         private const val DEFAULT_ICON_SIZE_PERCENT = 100

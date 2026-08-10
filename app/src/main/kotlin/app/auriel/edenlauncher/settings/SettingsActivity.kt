@@ -24,6 +24,9 @@ class SettingsActivity : Activity() {
 
     private lateinit var prefs: LauncherPrefs
 
+    /** Held so the permission result can put it back in sync with what was actually granted. */
+    private var audioToggle: android.widget.CheckBox? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = LauncherPrefs(this)
@@ -126,6 +129,34 @@ class SettingsActivity : Activity() {
                 suffix = "dp",
             ) { prefs.iconLabelSpacingDp = it },
         )
+
+        column.addView(header(getString(R.string.settings_section_wallpaper)), spacedParams(spacing * 2))
+
+        column.addView(
+            actionRow(getString(R.string.settings_video_open_picker)) {
+                startActivity(
+                    android.content.Intent(
+                        this,
+                        app.auriel.edenlauncher.wallpaper.picker.WallpaperPickerActivity::class.java,
+                    ),
+                )
+            },
+            spacedParams(spacing),
+        )
+
+        column.addView(label(getString(R.string.settings_wallpaper_speed)), spacedParams(spacing))
+        column.addView(
+            rangeSlider(
+                current = prefs.liveWallpaperSpeedPercent,
+                min = LauncherPrefs.MIN_WALLPAPER_SPEED,
+                max = LauncherPrefs.MAX_WALLPAPER_SPEED,
+                suffix = "%",
+            ) { prefs.liveWallpaperSpeedPercent = it },
+        )
+        column.addView(summary(getString(R.string.settings_wallpaper_speed_summary)))
+
+        column.addView(visualizerAudioToggle(), spacedParams(spacing))
+        column.addView(videoAudioToggle(), spacedParams(spacing))
 
         column.addView(
             label(getString(R.string.settings_grid_restart_note)),
@@ -268,6 +299,102 @@ class SettingsActivity : Activity() {
         }
     }
 
+    /**
+     * Sound for the video wallpaper.
+     *
+     * Off by default, and worth being explicit about why: the audio track is kept in the converted
+     * file either way, so this is a toggle rather than a reason to import the video again.
+     */
+    private fun videoAudioToggle(): View {
+        val toggle = android.widget.CheckBox(this).apply {
+            text = getString(R.string.settings_video_audio)
+            setTextColor(getColor(R.color.settings_text))
+            textSize = 16f
+            isChecked = prefs.videoWallpaperAudio
+            setOnCheckedChangeListener { _, checked -> prefs.videoWallpaperAudio = checked }
+        }
+
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(toggle)
+            addView(
+                TextView(this@SettingsActivity).apply {
+                    text = getString(R.string.settings_video_audio_summary)
+                    setTextColor(getColor(R.color.settings_text_secondary))
+                    textSize = 13f
+                },
+            )
+        }
+    }
+
+    /**
+     * Whether the music visualiser reads real audio.
+     *
+     * Turning it on asks for `RECORD_AUDIO` there and then rather than at the moment the wallpaper
+     * first tries to draw. A permission dialog that appears while you are looking at your home
+     * screen, with no obvious cause, is how apps train people to deny things.
+     */
+    private fun visualizerAudioToggle(): View {
+        val toggle = android.widget.CheckBox(this).apply {
+            text = getString(R.string.settings_visualizer_real_audio)
+            setTextColor(getColor(R.color.settings_text))
+            textSize = 16f
+            isChecked = prefs.visualizerUsesRealAudio
+            setOnCheckedChangeListener { button, checked ->
+                if (!checked) {
+                    prefs.visualizerUsesRealAudio = false
+                    return@setOnCheckedChangeListener
+                }
+
+                val granted = checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+                if (granted) {
+                    prefs.visualizerUsesRealAudio = true
+                } else {
+                    // Left off until the grant actually comes back, so the checkbox never claims
+                    // something that is not true.
+                    button.isChecked = false
+                    requestPermissions(
+                        arrayOf(android.Manifest.permission.RECORD_AUDIO),
+                        REQUEST_RECORD_AUDIO,
+                    )
+                }
+            }
+        }
+        audioToggle = toggle
+
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(toggle)
+            addView(summary(getString(R.string.settings_visualizer_real_audio_summary)))
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQUEST_RECORD_AUDIO) return
+
+        val granted = grantResults.firstOrNull() ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        prefs.visualizerUsesRealAudio = granted
+        audioToggle?.isChecked = granted
+        if (!granted) {
+            android.widget.Toast
+                .makeText(this, R.string.visualizer_permission_needed, android.widget.Toast.LENGTH_SHORT)
+                .show()
+        }
+    }
+
+    private fun actionRow(text: String, onClick: () -> Unit): View =
+        android.widget.Button(this).apply {
+            this.text = text
+            setOnClickListener { onClick() }
+        }
+
     // ---- small view builders ---------------------------------------------------------------------
 
     private fun header(text: String) = TextView(this).apply {
@@ -282,6 +409,12 @@ class SettingsActivity : Activity() {
         this.text = text
         setTextColor(getColor(R.color.settings_text))
         textSize = 16f
+    }
+
+    private fun summary(text: String) = TextView(this).apply {
+        this.text = text
+        setTextColor(getColor(R.color.settings_text_secondary))
+        textSize = 13f
     }
 
     private fun radio(title: String, summary: String, id: Int) = RadioButton(this).apply {
@@ -310,5 +443,6 @@ class SettingsActivity : Activity() {
     private companion object {
         const val ID_VERTICAL = 1
         const val ID_HORIZONTAL = 2
+        const val REQUEST_RECORD_AUDIO = 10
     }
 }

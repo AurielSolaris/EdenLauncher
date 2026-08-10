@@ -30,6 +30,8 @@ import app.auriel.edenlauncher.settings.SettingsActivity
 import app.auriel.edenlauncher.views.BubbleTextView
 import app.auriel.edenlauncher.views.CellLayout
 import app.auriel.edenlauncher.views.Workspace
+import app.auriel.edenlauncher.wallpaper.GLWallpaperService
+import app.auriel.edenlauncher.wallpaper.picker.WallpaperPickerActivity
 import app.auriel.edenlauncher.widget.WidgetPlaceholderView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -243,15 +245,15 @@ class Launcher : Activity(), ItemPlacementHandler {
     }
 
     /**
-     * Hands off to the system wallpaper picker.
+     * Opens Eden's own wallpaper picker.
      *
-     * Phase 3 replaces this with Eden's own picker, including live wallpapers; delegating for now
-     * means the option is never a dead end.
+     * An explicit intent rather than `ACTION_SET_WALLPAPER` through a chooser: this is Eden's
+     * picker and the user asked for it from Eden's overview, so putting a disambiguation dialog in
+     * front of it would be asking a question nobody posed.
      */
     private fun openWallpaperPicker() {
-        val intent = Intent(Intent.ACTION_SET_WALLPAPER)
         try {
-            startActivity(Intent.createChooser(intent, getString(R.string.options_wallpaper)))
+            startActivity(Intent(this, WallpaperPickerActivity::class.java))
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT).show()
         }
@@ -609,12 +611,41 @@ class Launcher : Activity(), ItemPlacementHandler {
         exitOverview()
         allApps.open()
         setHomeContentVisible(false)
+        setWallpaperPaused(true)
     }
 
     private fun closeAllApps() {
         if (!allApps.isOpen) return
         allApps.close()
         setHomeContentVisible(true)
+        setWallpaperPaused(false)
+    }
+
+    /**
+     * Tells a live wallpaper to stop drawing while the app drawer covers it.
+     *
+     * The system does not treat the wallpaper as hidden here: the launcher window still declares
+     * that it shows the wallpaper, so a live one would keep rendering thirty frames a second
+     * behind an opaque drawer, for nobody. `sendWallpaperCommand` is the sanctioned way for the
+     * home app to say so.
+     *
+     * Only sent when the drawer is opaque enough to actually hide it. Below that the user chose a
+     * see-through drawer precisely so they could watch the wallpaper, and freezing it would look
+     * like a bug.
+     */
+    private fun setWallpaperPaused(paused: Boolean) {
+        if (paused && appState.preferences.appDrawerOpacity < OPAQUE_DRAWER_THRESHOLD) return
+
+        val token = window.decorView.windowToken ?: return
+        val command = if (paused) {
+            GLWallpaperService.COMMAND_PAUSE
+        } else {
+            GLWallpaperService.COMMAND_RESUME
+        }
+        runCatching {
+            android.app.WallpaperManager.getInstance(this)
+                .sendWallpaperCommand(token, command, 0, 0, 0, null)
+        }
     }
 
     /**
@@ -712,5 +743,8 @@ class Launcher : Activity(), ItemPlacementHandler {
         const val STATE_CURRENT_PAGE = "launcher.currentPage"
         const val HOME_FADE_DURATION_MS = 160L
         const val OVERVIEW_CHROME_FADE_MS = 200L
+
+        /** Drawer opacity at or above which the wallpaper behind it is not worth drawing. */
+        const val OPAQUE_DRAWER_THRESHOLD = 90
     }
 }

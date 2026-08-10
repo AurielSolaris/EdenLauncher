@@ -44,6 +44,10 @@
     <color name="overview_badge_idle">#D9121A16</color>
     <color name="overview_panel_background">#F0121A16</color>
 
+    <color name="wallpaper_tile_empty">#1B241E</color>
+    <color name="wallpaper_tile_stroke">#4DA8E6C1</color>
+    <color name="wallpaper_tile_scrim">#B30E1611</color>
+
     <color name="drop_target_idle">#A0121A16</color>
     <color name="drop_target_active">#DCE05A5A</color>
 </resources>

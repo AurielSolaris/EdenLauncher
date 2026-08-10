@@ -47,4 +47,80 @@
     <string name="settings_icon_padding_horizontal">Horizontal spacing</string>
     <string name="settings_icon_label_spacing">Label gap</string>
     <string name="settings_grid_restart_note">Grid changes apply when you return to the home screen.</string>
+
+    <!-- Wallpapers -->
+    <string name="wallpaper_picker_title">Wallpaper</string>
+    <string name="wallpaper_section_live">Live wallpapers</string>
+    <string name="wallpaper_section_video">Your videos</string>
+    <string name="wallpaper_section_installed">Installed by other apps</string>
+    <string name="wallpaper_section_image">Pictures</string>
+
+    <string name="wallpaper_author">Eden</string>
+    <string name="wallpaper_video_description">Your own video, on a loop</string>
+
+    <string name="wallpaper_phasebeam">Phase Beam</string>
+    <string name="wallpaper_phasebeam_summary">Drifting beams of light over deep blue</string>
+    <string name="wallpaper_noisefield">Noise Field</string>
+    <string name="wallpaper_noisefield_summary">Particles carried by a slow current</string>
+    <string name="wallpaper_galaxy4">Galaxy</string>
+    <string name="wallpaper_galaxy4_summary">A spiral turning above a starfield</string>
+    <string name="wallpaper_grass">Grass</string>
+    <string name="wallpaper_grass_summary">A meadow under your own sky, hour by hour</string>
+    <string name="wallpaper_holospiral">Holo Spiral</string>
+    <string name="wallpaper_holospiral_summary">A tunnel of light spiralling away</string>
+    <string name="wallpaper_magicsmoke">Magic Smoke</string>
+    <string name="wallpaper_magicsmoke_summary">Slow coloured smoke, curling</string>
+    <string name="wallpaper_nexus">Nexus</string>
+    <string name="wallpaper_nexus_summary">Coloured pulses racing on black</string>
+    <string name="wallpaper_fall">Fall</string>
+    <string name="wallpaper_fall_summary">Leaves onto water, and the ripples where they land</string>
+    <string name="wallpaper_polarclock">Polar Clock</string>
+    <string name="wallpaper_polarclock_summary">The time, as six turning arcs</string>
+    <string name="wallpaper_walkaround">Walkaround</string>
+    <string name="wallpaper_walkaround_summary">Tilt the phone to look around the ridges</string>
+    <string name="wallpaper_musicvis">Music Visualization</string>
+    <string name="wallpaper_musicvis_summary">A spectrum that rises and falls</string>
+
+    <string name="wallpaper_permission_note">Uses its own rhythm by default. Turn on real audio in settings if you want it to follow what is playing.</string>
+    <string name="settings_visualizer_real_audio">Visualiser follows real audio</string>
+    <string name="settings_visualizer_real_audio_summary">Off by default. On, it reads what the device is playing and needs the record-audio permission, which lights the microphone indicator. Off, it runs on its own invented rhythm and asks for nothing.</string>
+    <string name="visualizer_permission_needed">Record-audio permission is needed for that</string>
+    <string name="visualizer_choice_title">How should it react?</string>
+    <string name="visualizer_choice_message">This wallpaper can follow whatever your phone is playing, or move to a rhythm of its own.\n\nFollowing real audio needs the record-audio permission. It reads the sound your phone is playing, not your microphone, but Android asks with the same dialog either way and the microphone indicator will show.\n\nIts own rhythm needs no permission at all and most people cannot tell the difference.</string>
+    <string name="visualizer_choice_ambient">Its own rhythm</string>
+    <string name="visualizer_choice_real">Follow real audio</string>
+    <string name="visualizer_falling_back">No permission, so it will use its own rhythm. You can change this in Eden settings.</string>
+
+    <string name="wallpaper_set">Set wallpaper</string>
+    <string name="wallpaper_applied">Wallpaper set</string>
+    <string name="wallpaper_failed">Could not set that wallpaper</string>
+    <string name="wallpaper_preview_note">Previews are still frames. Nothing starts running until you set it.</string>
+
+    <string name="wallpaper_pick_video">Choose a video</string>
+    <string name="wallpaper_video_current">Your video</string>
+    <string name="wallpaper_video_none">No video chosen yet</string>
+    <string name="wallpaper_video_preparing">Preparing video</string>
+    <string name="wallpaper_video_progress">Preparing video: %1$d%%</string>
+    <string name="wallpaper_video_ready">Video ready</string>
+    <string name="wallpaper_video_failed">Could not read that video</string>
+    <string name="wallpaper_video_unsupported">This device cannot decode that file. Try an MP4.</string>
+    <string name="wallpaper_pick_image">Choose a picture</string>
+    <string name="wallpaper_video_terms">Converted to 1080p at 24fps, first minute only, and kept on this device. Sound stays off until you turn it on in settings.</string>
+
+    <string name="settings_section_wallpaper">Wallpaper</string>
+    <string name="settings_video_audio">Play video audio</string>
+    <string name="settings_video_audio_summary">Off by default. A wallpaper that makes noise is rarely what you wanted.</string>
+    <string name="settings_video_open_picker">Open wallpaper picker</string>
+    <string name="settings_wallpaper_speed">Live wallpaper speed</string>
+    <string name="settings_wallpaper_speed_summary">Applies to Eden\'s own wallpapers. Takes effect next time you return to the home screen.</string>
+
+    <!-- Icon options -->
+    <string name="icon_option_rename">Rename</string>
+    <string name="icon_option_new_folder">New folder</string>
+    <string name="icon_option_remove">Remove</string>
+    <string name="icon_option_app_info">App info</string>
+    <string name="rename_dialog_title">Rename</string>
+    <string name="rename_dialog_reset">Reset</string>
+    <string name="rename_save">Save</string>
+    <string name="cancel">Cancel</string>
 </resources>

@@ -11,6 +11,19 @@
     <uses-permission android:name="android.permission.SET_WALLPAPER_HINTS" />
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
 
+    <!--
+        Only for the music visualiser, and only if the user turns real audio on. The Visualizer
+        API taps the device's output mix rather than the microphone - it cannot hear the room -
+        but Android gates it behind this permission regardless. The wallpaper runs on an invented
+        rhythm unless asked otherwise, so this is never requested by default.
+    -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Walkaround tilts with the phone; every other wallpaper works without it. -->
+    <uses-feature
+        android:name="android.hardware.sensor.accelerometer"
+        android:required="false" />
+
     <application
         android:name=".EdenApplication"
         android:allowBackup="true"
@@ -80,6 +93,191 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!--
+            Eden's own wallpaper picker. Previews here are still frames rendered offscreen, so
+            browsing never starts a wallpaper service and nothing is lost if something else takes
+            the foreground while you are looking.
+        -->
+        <activity
+            android:name=".wallpaper.picker.WallpaperPickerActivity"
+            android:exported="true"
+            android:label="@string/wallpaper_picker_title"
+            android:theme="@style/Theme.EdenSettings">
+            <intent-filter>
+                <action android:name="android.intent.action.SET_WALLPAPER" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!--
+            Bundled live wallpapers.
+
+            All four are rewrites of AOSP originals that no longer ship and could not be built if
+            they did: they were RenderScript, which the Android Gradle plugin dropped in 9.0. See
+            NOTICE for what each one derives from.
+        -->
+        <service
+            android:name=".wallpaper.live.PhaseBeamWallpaperService"
+            android:exported="true"
+            android:label="@string/wallpaper_phasebeam"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper_phasebeam" />
+        </service>
+
+        <service
+            android:name=".wallpaper.live.NoiseFieldWallpaperService"
+            android:exported="true"
+            android:label="@string/wallpaper_noisefield"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper_noisefield" />
+        </service>
+
+        <service
+            android:name=".wallpaper.live.Galaxy4WallpaperService"
+            android:exported="true"
+            android:label="@string/wallpaper_galaxy4"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper_galaxy4" />
+        </service>
+
+        <service
+            android:name=".wallpaper.live.GrassWallpaperService"
+            android:exported="true"
+            android:label="@string/wallpaper_grass"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper_grass" />
+        </service>
+
+        <service
+            android:name=".wallpaper.live.HoloSpiralWallpaperService"
+            android:exported="true"
+            android:label="@string/wallpaper_holospiral"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper_holospiral" />
+        </service>
+
+        <service
+            android:name=".wallpaper.live.MagicSmokeWallpaperService"
+            android:exported="true"
+            android:label="@string/wallpaper_magicsmoke"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper_magicsmoke" />
+        </service>
+
+        <service
+            android:name=".wallpaper.live.NexusWallpaperService"
+            android:exported="true"
+            android:label="@string/wallpaper_nexus"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper_nexus" />
+        </service>
+
+        <service
+            android:name=".wallpaper.live.FallWallpaperService"
+            android:exported="true"
+            android:label="@string/wallpaper_fall"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper_fall" />
+        </service>
+
+        <service
+            android:name=".wallpaper.live.PolarClockWallpaperService"
+            android:exported="true"
+            android:label="@string/wallpaper_polarclock"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper_polarclock" />
+        </service>
+
+        <!-- Reads the accelerometer while it is drawing, and drops it the moment it is not. -->
+        <service
+            android:name=".wallpaper.live.WalkaroundWallpaperService"
+            android:exported="true"
+            android:label="@string/wallpaper_walkaround"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper_walkaround" />
+        </service>
+
+        <!--
+            The visualiser. Runs on an invented rhythm by default and needs no permission for
+            that; RECORD_AUDIO is requested only if the user turns real audio on in settings.
+        -->
+        <service
+            android:name=".wallpaper.live.MusicVisualizationWallpaperService"
+            android:exported="true"
+            android:label="@string/wallpaper_musicvis"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper_musicvis" />
+        </service>
+
+        <!-- Plays the video the user imported, converted to 1080p at 24fps by MediaCodec. -->
+        <service
+            android:name=".wallpaper.VideoWallpaperService"
+            android:exported="true"
+            android:label="@string/wallpaper_video_current"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper_video" />
+        </service>
 
     </application>
 
