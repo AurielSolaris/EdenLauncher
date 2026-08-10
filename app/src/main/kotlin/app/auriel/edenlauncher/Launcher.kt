@@ -28,7 +28,9 @@ import app.auriel.edenlauncher.model.ShortcutInfo
 import app.auriel.edenlauncher.settings.LauncherPrefs
 import app.auriel.edenlauncher.settings.SettingsActivity
 import app.auriel.edenlauncher.views.BubbleTextView
+import app.auriel.edenlauncher.views.ButtonDropTarget
 import app.auriel.edenlauncher.views.CellLayout
+import app.auriel.edenlauncher.views.IconOptionsPopup
 import app.auriel.edenlauncher.views.Workspace
 import app.auriel.edenlauncher.wallpaper.GLWallpaperService
 import app.auriel.edenlauncher.wallpaper.picker.WallpaperPickerActivity
@@ -58,6 +60,7 @@ class Launcher : Activity(), ItemPlacementHandler {
     private lateinit var dragController: DragController
 
     private var openFolder: Folder? = null
+    private var iconOptions: IconOptionsPopup? = null
 
     /** Grid settings as of the last resume; a change means the hierarchy has to be rebuilt. */
     private var gridSignature: String? = null
@@ -109,11 +112,14 @@ class Launcher : Activity(), ItemPlacementHandler {
 
         dragController.addDropTarget(binding.workspace)
         dragController.addDropTarget(binding.hotseat)
-        dragController.addDropTarget(binding.deleteDropTarget)
+        dragController.addDropTarget(binding.dropTargetBar.removeTarget)
+        dragController.addDropTarget(binding.dropTargetBar.uninstallTarget)
 
         binding.workspace.placementHandler = this
         binding.hotseat.placementHandler = this
-        binding.deleteDropTarget.placementHandler = this
+
+        binding.dropTargetBar.removeTarget.onDropped = { info -> onItemRemoved(info) }
+        binding.dropTargetBar.uninstallTarget.onDropped = { info -> uninstall(info) }
 
         // A trailing empty page appears while dragging so an item can be flicked onto a new page,
         // and empty pages are swept up when the gesture ends. This is AOSP's behaviour and the
@@ -121,12 +127,13 @@ class Launcher : Activity(), ItemPlacementHandler {
         dragController.listener = object : DragController.DragListener {
             override fun onDragStart(info: ItemInfo?) {
                 exitOverview()
-                binding.deleteDropTarget.setDragInProgress(true)
+                closeIconOptions()
+                binding.dropTargetBar.setDragInProgress(true, info)
                 binding.workspace.addExtraEmptyScreen()
             }
 
             override fun onDragEnd() {
-                binding.deleteDropTarget.setDragInProgress(false)
+                binding.dropTargetBar.setDragInProgress(false)
                 commitScreenChanges()
             }
         }
@@ -267,9 +274,20 @@ class Launcher : Activity(), ItemPlacementHandler {
             startApp(app, null)
         }
         allApps.onAppLongClick = { app, view ->
-            // Dragging out of the drawer copies the app onto the workspace; the drawer entry stays.
-            closeAllApps()
-            dragController.startDrag(view, binding.workspace, app.toShortcut(), hideOriginal = false)
+            // Same two-in-one gesture as the workspace: hold for the options, move to drag the app
+            // out onto the home screen. The drawer entry itself never moves - dragging out of the
+            // drawer copies, which is why hideOriginal is false.
+            dragController.preparePendingDrag(
+                view = view,
+                source = binding.workspace,
+                info = app.toShortcut(),
+                hideOriginal = false,
+                onPromoted = {
+                    closeIconOptions()
+                    closeAllApps()
+                },
+            )
+            showDrawerIconOptions(view, app)
         }
 
         val prefs = appState.preferences
@@ -342,10 +360,283 @@ class Launcher : Activity(), ItemPlacementHandler {
         else -> null
     }
 
+    /**
+     * A long press on a workspace icon.
+     *
+     * Arms a drag and shows the icon's options at the same time. Hold still and you get the menu;
+     * move and the drag you were expecting takes over and the menu disappears. Neither gesture had
+     * to be given up to make room for the other - see [DragController.preparePendingDrag].
+     */
     private fun startDragFromWorkspace(view: View, info: ItemInfo): Boolean {
         closeFolder()
-        dragController.startDrag(view, binding.workspace, info, hideOriginal = true)
+        closeIconOptions()
+
+        dragController.preparePendingDrag(
+            view = view,
+            source = binding.workspace,
+            info = info,
+            hideOriginal = true,
+            onPromoted = { closeIconOptions() },
+        )
+        showIconOptions(view, info)
         return true
+    }
+
+    // ---- icon options ----------------------------------------------------------------------------
+
+    private fun showIconOptions(anchor: View, info: ItemInfo) {
+        val uninstallablePackage = ButtonDropTarget.uninstallablePackage(info)
+
+        val popup = IconOptionsPopup(this)
+            .addAction(R.string.icon_option_rename) { showRenameDialog(info, anchor) }
+
+        // Folders already are folders; only a loose icon can be put into a new one.
+        if (info is ShortcutInfo && info !is FolderInfo) {
+            popup.addAction(R.string.icon_option_new_folder) { createFolderAround(info) }
+        }
+
+        popup
+            // Icon packs land in 0.4.0. Shown greyed rather than hidden, so the answer to "can
+            // Eden do icon packs" is visible instead of having to be guessed at.
+            .addAction(R.string.icon_option_icon_pack, enabled = false) {}
+            .addAction(R.string.icon_option_app_info, enabled = info.intent?.component != null) {
+                showAppInfo(info)
+            }
+            .addAction(R.string.icon_option_remove) { onItemRemoved(info) }
+            .addAction(R.string.icon_option_uninstall, enabled = uninstallablePackage != null) {
+                uninstall(info)
+            }
+
+        iconOptions = popup
+        // The popup owns its own dismissal. Routing it through the drag layer's touch-complete
+        // hook would close it on the ACTION_UP of the long press that opened it.
+        popup.showAt(binding.dragLayer, anchor) { iconOptions = null }
+    }
+
+    /**
+     * The drawer's version of the icon menu.
+     *
+     * A shorter list, because two of the workspace actions have no meaning here: a drawer entry is
+     * not on the home screen, so it cannot be removed from it, and it is not in a folder and
+     * cannot be put in one.
+     *
+     * Renaming is here, and it applies everywhere the app is shown. Search still matches the name
+     * the app gives itself, so renaming can never make an app unfindable.
+     *
+     * Uninstall is here because this is where people go looking for it.
+     */
+    private fun showDrawerIconOptions(anchor: View, app: AppInfo) {
+        val info = app.toShortcut()
+
+        val popup = IconOptionsPopup(this)
+            .addAction(
+                R.string.icon_option_rename,
+                enabled = app.componentName != null,
+            ) { showDrawerRenameDialog(app) }
+            .addAction(R.string.icon_option_icon_pack, enabled = false) {}
+            .addAction(R.string.icon_option_app_info, enabled = info.intent?.component != null) {
+                showAppInfo(info)
+            }
+            .addAction(
+                R.string.icon_option_uninstall,
+                enabled = ButtonDropTarget.uninstallablePackage(info) != null,
+            ) { uninstall(info) }
+
+        iconOptions = popup
+        popup.showAt(binding.dragLayer, anchor) { iconOptions = null }
+    }
+
+    /**
+     * Renames an app in the drawer.
+     *
+     * Stored against the component rather than against a database row, because a drawer entry has
+     * no row - it is rebuilt from the package manager on every load. Clearing the field restores
+     * the app's own name.
+     *
+     * The drawer is reloaded afterwards rather than patched in place: the list is sorted by the
+     * name shown, so a rename can move the app, and quietly leaving it under the old letter would
+     * be worse than the reload.
+     */
+    private fun showDrawerRenameDialog(app: AppInfo) {
+        val component = app.componentName ?: return
+
+        val input = android.widget.EditText(this).apply {
+            setText(app.title?.toString().orEmpty())
+            setSelection(text.length)
+            setSingleLine()
+        }
+
+        val padding = resources.getDimensionPixelSize(R.dimen.settings_padding)
+        val container = android.widget.FrameLayout(this).apply {
+            setPadding(padding, padding / 2, padding, 0)
+            addView(input)
+        }
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.rename_dialog_title)
+            .setView(container)
+            .setPositiveButton(R.string.rename_save) { _, _ ->
+                applyDrawerRename(component, input.text?.toString().orEmpty().trim())
+            }
+            .setNeutralButton(R.string.rename_dialog_reset) { _, _ ->
+                applyDrawerRename(component, "")
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun applyDrawerRename(component: android.content.ComponentName, title: String) {
+        appState.preferences.setAppTitleOverride(
+            component.flattenToString(),
+            title.ifBlank { null },
+        )
+        scope.launch {
+            val results = appState.model.load()
+            allApps.setApps(results.allApps)
+        }
+    }
+
+    private fun closeIconOptions() {
+        iconOptions?.dismiss()
+        iconOptions = null
+    }
+
+    /**
+     * Renames an item, storing the new label against its row.
+     *
+     * The title is Eden's, not the app's: the app keeps whatever it calls itself, and clearing the
+     * field puts the original name back rather than leaving a blank icon. That reversibility is
+     * the whole reason renaming is safe to offer.
+     */
+    private fun showRenameDialog(info: ItemInfo, anchor: View) {
+        val input = android.widget.EditText(this).apply {
+            setText(info.title?.toString().orEmpty())
+            setSelection(text.length)
+            setSingleLine()
+        }
+
+        val padding = resources.getDimensionPixelSize(R.dimen.settings_padding)
+        val container = android.widget.FrameLayout(this).apply {
+            setPadding(padding, padding / 2, padding, 0)
+            addView(input)
+        }
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.rename_dialog_title)
+            .setView(container)
+            .setPositiveButton(R.string.rename_save) { _, _ ->
+                applyRename(info, input.text?.toString().orEmpty().trim(), anchor)
+            }
+            .setNeutralButton(R.string.rename_dialog_reset) { _, _ ->
+                applyRename(info, "", anchor)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun applyRename(info: ItemInfo, newTitle: String, anchor: View) {
+        val resolved = newTitle.ifEmpty { originalTitleFor(info) }
+
+        when (info) {
+            is FolderInfo -> info.rename(resolved)
+            else -> info.title = resolved
+        }
+
+        when (anchor) {
+            is BubbleTextView -> anchor.setLabelVisible(info.container != Containers.HOTSEAT)
+            is FolderIcon -> anchor.applyFrom(info as FolderInfo)
+        }
+
+        scope.launch { appState.repository.updateItem(info) }
+    }
+
+    /** The name the app gives itself, used when a custom name is cleared. */
+    private fun originalTitleFor(info: ItemInfo): String {
+        val component = info.intent?.component ?: return getString(R.string.folder_name)
+        return runCatching {
+            val activityInfo = packageManager.getActivityInfo(component, 0)
+            activityInfo.loadLabel(packageManager).toString()
+        }.getOrDefault(info.title?.toString() ?: "")
+    }
+
+    /**
+     * Wraps a single icon in a new folder, in place.
+     *
+     * Until now the only way to make a folder was to stack one icon onto another, which quietly
+     * requires you to already own two things you want together. Sometimes you just want the folder
+     * first.
+     */
+    private fun createFolderAround(item: ShortcutInfo) {
+        scope.launch {
+            val folder = FolderInfo().apply {
+                rename(getString(R.string.folder_name))
+                container = item.container
+                screenId = item.screenId
+                cellX = item.cellX
+                cellY = item.cellY
+                rank = item.rank
+                itemType = ItemType.FOLDER
+            }
+            appState.repository.addItem(folder)
+
+            findViewFor(item)?.let { removeViewFromParent(it) }
+
+            item.container = folder.id
+            item.screenId = -1L
+            item.cellX = -1
+            item.cellY = -1
+            item.rank = 0
+            folder.contents.add(item)
+            appState.repository.updateItem(item)
+
+            val icon = createItemView(folder) ?: return@launch
+            if (folder.container == Containers.HOTSEAT) {
+                binding.hotseat.addItem(
+                    icon,
+                    -1,
+                    CellLayout.LayoutParams(folder.cellX, folder.cellY, 1, 1),
+                )
+            } else {
+                binding.workspace.addInScreen(icon, folder)
+            }
+            Toast.makeText(this@Launcher, R.string.folder_created, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showAppInfo(info: ItemInfo) {
+        val component = info.intent?.component ?: return
+        runCatching {
+            getSystemService(LauncherApps::class.java)
+                .startAppDetailsActivity(component, info.user, null, null)
+        }.onFailure {
+            Log.w(TAG, "Could not open app info for $component", it)
+            Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * Hands off to the system uninstaller.
+     *
+     * `ACTION_DELETE` rather than a silent removal on purpose: uninstalling is the one irreversible
+     * thing a launcher can trigger, and the system's own confirmation is the right last word. Eden
+     * does not remove the icon itself - the model reload after the app disappears does that, so a
+     * cancelled uninstall leaves the home screen exactly as it was.
+     */
+    private fun uninstall(info: ItemInfo) {
+        val packageName = ButtonDropTarget.uninstallablePackage(info)
+        if (packageName == null) {
+            Toast.makeText(this, R.string.uninstall_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val intent = Intent(Intent.ACTION_DELETE, android.net.Uri.parse("package:$packageName"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            startActivity(intent)
+        } catch (e: ActivityNotFoundException) {
+            Log.w(TAG, "No uninstaller for $packageName", e)
+            Toast.makeText(this, R.string.uninstall_unavailable, Toast.LENGTH_SHORT).show()
+        }
     }
 
     /** Puts an item that no longer fits into the first free cell anywhere on the workspace. */
@@ -722,6 +1013,7 @@ class Launcher : Activity(), ItemPlacementHandler {
     private fun onBackRequested() {
         when {
             dragController.isDragging -> dragController.cancelDrag()
+            iconOptions != null -> closeIconOptions()
             binding.workspace.isInOverview -> exitOverview()
             allApps.isOpen -> closeAllApps()
             openFolder != null -> closeFolder()

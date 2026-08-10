@@ -31,6 +31,11 @@
     <dimen name="settings_padding">20dp</dimen>
     <dimen name="settings_row_spacing">14dp</dimen>
 
+    <!-- Per-icon options menu. -->
+    <dimen name="icon_options_padding">18dp</dimen>
+    <dimen name="icon_options_row_padding">12dp</dimen>
+    <dimen name="icon_options_corner_radius">16dp</dimen>
+
     <!-- Open folder panel. -->
     <dimen name="folder_corner_radius">20dp</dimen>
     <dimen name="folder_padding">12dp</dimen>

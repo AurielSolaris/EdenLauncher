@@ -40,6 +40,9 @@ class NexusRenderer : WallpaperRenderer {
     private var lastTime = 0f
     private val random = Random(PARTICLE_SEED)
 
+    /** Round-robin index for pulses recycled by a touch. */
+    private var nextTouchPulse = 0
+
     override fun onSurfaceCreated() {
         pulses.onSurfaceCreated()
 
@@ -66,6 +69,44 @@ class NexusRenderer : WallpaperRenderer {
 
     override fun onOffsetsChanged(xOffset: Float) {
         this.xOffset = xOffset
+    }
+
+    /**
+     * Fires a pulse away from wherever you touched.
+     *
+     * This is the thing about the Nexus wallpaper people actually remember: the grid answered you.
+     * A touch drops the next pulse in the pool onto the track running through that point and
+     * starts it there, so a light shoots away from your finger along the line you touched.
+     *
+     * Recycling an existing pulse rather than adding one keeps the particle count fixed - the
+     * wallpaper costs exactly the same whether you are poking at it or not.
+     */
+    override fun onTouch(x: Float, y: Float) {
+        if (width <= 1f || height <= 1f) return
+
+        // Two pulses, one along each axis, so the touch reads as a point on a grid rather than a
+        // line that happened to move.
+        for (axis in 0..1) {
+            val i = nextTouchPulse
+            nextTouchPulse = (nextTouchPulse + 1) % PULSE_COUNT
+
+            vertical[i] = axis == 0
+            backwards[i] = random.nextBoolean()
+            hue[i] = random.nextInt(HUES.size)
+            speed[i] = 0.18f + random.nextFloat() * 0.22f
+            thickness[i] = width * (0.018f + random.nextFloat() * 0.014f)
+
+            if (vertical[i]) {
+                track[i] = (x / width).coerceIn(0f, 1f)
+                progress[i] = (y / height).coerceIn(0f, 1f)
+            } else {
+                track[i] = (y / height).coerceIn(0f, 1f)
+                progress[i] = (x / width).coerceIn(0f, 1f)
+            }
+            // Stored the way the draw loop reads it, so a backwards pulse still starts under the
+            // finger rather than mirrored across the screen.
+            if (backwards[i]) progress[i] = 1f - progress[i]
+        }
     }
 
     override fun onDrawFrame(timeSeconds: Float) {

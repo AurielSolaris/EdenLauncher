@@ -88,6 +88,12 @@ class FallRenderer : WallpaperRenderer {
         this.xOffset = xOffset
     }
 
+    /** Touching the water rings it, the same as a leaf landing. It is water; it should answer. */
+    override fun onTouch(x: Float, y: Float) {
+        if (y < waterLine) return
+        spawnRipple(x, y)
+    }
+
     override fun onDrawFrame(timeSeconds: Float) {
         val delta = (timeSeconds - lastTime).coerceIn(0f, MAX_STEP_SECONDS)
         lastTime = timeSeconds

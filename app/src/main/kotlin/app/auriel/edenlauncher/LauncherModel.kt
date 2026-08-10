@@ -91,6 +91,11 @@ class LauncherModel(
         activityCache.clear()
         val apps = ArrayList<AppInfo>(196)
 
+        val prefs = LauncherAppState.getInstance(context).preferences
+        // Checked once rather than per app: on the overwhelmingly common path nobody has renamed
+        // anything, and this turns a few hundred preference lookups into one.
+        val hasOverrides = prefs.hasAnyTitleOverride()
+
         for (user in userManager.userProfiles) {
             val activities = try {
                 launcherApps.getActivityList(null, user)
@@ -102,13 +107,18 @@ class LauncherModel(
             for (activity in activities) {
                 activityCache[ComponentKey(activity.componentName, user)] = activity
                 apps.add(
-                    AppInfo(activity, user).also {
-                        it.icon = iconCache.getIcon(activity, user)
+                    AppInfo(activity, user).also { app ->
+                        app.icon = iconCache.getIcon(activity, user)
+                        if (hasOverrides) {
+                            prefs.appTitleOverride(activity.componentName.flattenToString())
+                                ?.let { app.title = it }
+                        }
                     },
                 )
             }
         }
 
+        // Sorted by the name actually shown, so a renamed app sits where its new name puts it.
         apps.sortWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title?.toString().orEmpty() })
         return apps
     }

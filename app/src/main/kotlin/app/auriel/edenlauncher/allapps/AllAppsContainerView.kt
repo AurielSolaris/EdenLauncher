@@ -131,6 +131,10 @@ class AllAppsContainerView @JvmOverloads constructor(
     /**
      * Filters by label. Substring rather than prefix matching, because "tube" should find
      * "YouTube" - the behaviour every OEM drawer has and stock AOSP did not.
+     *
+     * A renamed app matches on either name. Searching only the name you chose would mean that
+     * renaming an app quietly makes it unfindable under the name it actually has, which is a trap
+     * that only springs months later.
      */
     private fun applyFilter() {
         val view = drawerView ?: return
@@ -140,7 +144,10 @@ class AllAppsContainerView @JvmOverloads constructor(
         }
         val needle = query.trim()
         view.submitApps(
-            allApps.filter { it.title?.contains(needle, ignoreCase = true) == true },
+            allApps.filter { app ->
+                app.title?.contains(needle, ignoreCase = true) == true ||
+                    app.originalTitle?.contains(needle, ignoreCase = true) == true
+            },
         )
     }
 

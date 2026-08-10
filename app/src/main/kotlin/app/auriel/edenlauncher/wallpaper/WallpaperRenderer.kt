@@ -48,6 +48,15 @@ interface WallpaperRenderer {
     fun onResumed() = Unit
 
     /**
+     * A touch landed on the home screen, in surface pixels.
+     *
+     * The wallpaper sees touches that the launcher does not consume - taps on empty space, mostly.
+     * Reacting to them is what made the Nexus wallpaper feel like a surface rather than a picture,
+     * and it is the detail people remember about it. Most renderers ignore this.
+     */
+    fun onTouch(x: Float, y: Float) = Unit
+
+    /**
      * A moment that shows this wallpaper at its most representative, in seconds.
      *
      * Most of these start from a blank or uniform state and only look like themselves once the

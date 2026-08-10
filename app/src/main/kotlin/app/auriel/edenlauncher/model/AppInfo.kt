@@ -21,10 +21,21 @@ class AppInfo() : ItemInfo() {
     var icon: Bitmap? = null
     var disabledFlags: Int = 0
 
+    /**
+     * The name the app gives itself, kept even when [title] has been overridden by the user.
+     *
+     * Search matches against both. Renaming an app in a drawer that lists every app on the phone
+     * would otherwise make it unfindable under the only name you might remember - which is a fine
+     * way to lose an app you renamed six months ago and have not opened since.
+     */
+    var originalTitle: CharSequence? = null
+        private set
+
     constructor(activity: LauncherActivityInfo, user: UserHandle) : this() {
         this.user = user
         componentName = activity.componentName
         title = activity.label
+        originalTitle = activity.label
         launchIntent = makeLaunchIntent(activity.componentName)
     }
 

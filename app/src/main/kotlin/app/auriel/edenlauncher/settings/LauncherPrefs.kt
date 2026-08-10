@@ -171,6 +171,30 @@ class LauncherPrefs(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_VISUALIZER_REAL_AUDIO, value).apply()
 
     /**
+     * A name the user gave an app in the drawer, or null if they have not renamed it.
+     *
+     * Kept in preferences rather than the workspace database on purpose: a drawer entry is not a
+     * placed item and has no row of its own. It is rebuilt from `LauncherApps` on every load, so
+     * the override has to live somewhere that survives independently of the layout.
+     *
+     * @param component a flattened [android.content.ComponentName].
+     */
+    fun appTitleOverride(component: String): String? =
+        prefs.getString(KEY_TITLE_OVERRIDE_PREFIX + component, null)
+
+    /** Pass null to drop the override and go back to the app's own name. */
+    fun setAppTitleOverride(component: String, title: String?) {
+        val key = KEY_TITLE_OVERRIDE_PREFIX + component
+        prefs.edit().apply {
+            if (title.isNullOrBlank()) remove(key) else putString(key, title)
+        }.apply()
+    }
+
+    /** True when at least one app has been renamed, so the loader can skip the lookup entirely. */
+    fun hasAnyTitleOverride(): Boolean =
+        prefs.all.keys.any { it.startsWith(KEY_TITLE_OVERRIDE_PREFIX) }
+
+    /**
      * A token that changes whenever something requiring a full rebind changes.
      *
      * Cheaper and less error-prone than wiring a listener per setting: the launcher compares this
@@ -240,6 +264,7 @@ class LauncherPrefs(context: Context) {
         private const val KEY_VIDEO_AUDIO = "video_wallpaper_audio"
         private const val KEY_WALLPAPER_SPEED = "live_wallpaper_speed"
         private const val KEY_VISUALIZER_REAL_AUDIO = "visualizer_real_audio"
+        private const val KEY_TITLE_OVERRIDE_PREFIX = "app_title."
 
         private const val DEFAULT_DRAWER_OPACITY = 92
         private const val DEFAULT_ICON_SIZE_PERCENT = 100

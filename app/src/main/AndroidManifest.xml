@@ -12,6 +12,14 @@
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
 
     <!--
+        Needed to launch the system uninstall confirmation. Without it the platform silently drops
+        the intent since Android 8 - no exception, no log, nothing happens - which is exactly what
+        it looked like. Eden never uninstalls anything itself; this only opens the system's own
+        dialog, and the system still asks.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+
+    <!--
         Only for the music visualiser, and only if the user turns real audio on. The Visualizer
         API taps the device's output mix rather than the microphone - it cannot hear the room -
         but Android gates it behind this permission regardless. The wallpaper runs on an invented

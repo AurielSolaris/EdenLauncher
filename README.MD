@@ -27,10 +27,21 @@ Eden gives that back. Every one of those is a setting, and the defaults are only
   Remove to get rid of one.
 - **Your grid, your icons.** Columns, rows, dock size, icon size, spacing, label gap - all
   adjustable, all with an Auto that just works if you would rather not think about it.
+- **Eleven live wallpapers**, rewritten from the AOSP originals that Android stopped shipping - Phase
+  Beam, Noise Field, Galaxy, Holo Spiral, Magic Smoke, Nexus, Fall, Grass, Polar Clock, Walkaround,
+  Music Visualization. Nexus and Fall answer to a touch. Grass tracks your actual sky, hour by hour.
+  Adjustable speed, and nothing draws while you are not looking at it.
+- **Your own video as a wallpaper.** Pick an MP4; the phone's hardware encoder converts it to 1080p
+  at 24fps and loops it, muted unless you say otherwise.
+- **Previews that cannot lose your place.** Every thumbnail in the picker is a still frame rendered
+  offscreen, never a running service, so glancing at a wallpaper cannot be interrupted by a
+  notification or a mis-tapped camera button.
+- **Rename anything**, on the home screen or in the drawer, and clear the field to get the app's own
+  name back. Search still matches the original, so a rename can never hide an app from you.
 - **Its own settings screen**, because a launcher lifted out of AOSP has no host app to hang
   preferences off, and no two OEM Settings apps agree on where they should live.
 
-Coming next: live wallpapers as a first-class feature, then widgets.
+Coming next: icon packs and custom icons, then widgets.
 
 ---
 
@@ -40,10 +51,10 @@ Coming next: live wallpapers as a first-class feature, then widgets.
 |-------|-------|-------|
 | **1** | Foundation - project, models, database, workspace, paging, drag layer | **Done** |
 | **2** | Core launcher - loader, drag & drop, app drawer, folders, page management | **Done** (widget hosting deferred) |
-| 3 | Live wallpaper - discovery, picker, parallax, dimensions | Next |
-| 4 | Polish - animations, drop targets, QSB, deep shortcut popups | Not started |
+| **3** | Live wallpaper - GL engine, eleven bundled wallpapers, video wallpapers, still-frame picker | **Done** |
+| 4 | Icons - icon packs, custom icons, then widget hosting | Next |
 
-Running on a Galaxy M31 (Android 16, API 36). Release APK is about 600 KB.
+Running on a Galaxy M31 (Android 16, API 36). Release APK is about 700 KB, with no native code.
 
 ---
 
@@ -82,7 +93,9 @@ Not preferences. Rules.
    draw. Reuse scratch buffers. A row of page dots is a `Canvas` call, not five views.
 2. **Every dependency has to earn its place.** The list is: `core-ktx`, `recyclerview`,
    `kotlinx-coroutines`, and Room. No AppCompat, no Material, no `lifecycle-ktx` - that last one
-   was dropped for one hand-written `CoroutineScope`.
+   was dropped for one hand-written `CoroutineScope`. Video wallpapers go through the platform's
+   own `MediaCodec` rather than a bundled FFmpeg, which would have been GPL, forty megabytes, and
+   unmaintained since January 2025.
 3. **Modern APIs, not compatibility shims.** `minSdk 29` exists so the Nougat-era calls can be
    replaced outright: coroutines over `AsyncTask`, `WindowInsets` over `fitSystemWindows`, Room
    over `SQLiteOpenHelper` and a `ContentProvider`.
@@ -120,6 +133,8 @@ Eden/
         |-- dragndrop/              DragController and drop-target contracts
         |-- folder/                 Folder and FolderIcon
         |-- allapps/                The two drawer modes and their shared search
+        |-- wallpaper/              GL engine, the eleven wallpapers, video, and the picker
+        |-- media/                  MediaCodec video transcoder
         |-- settings/               Preferences and the settings screen
         |-- widget/                 Placeholder until hosting lands
         `-- util/                   Icon cache, user cache, bitmap helpers
@@ -129,9 +144,15 @@ Eden/
 
 ## Licence and origins
 
-Eden is MIT. Parts of it are ported from AOSP Launcher3, which is Apache 2.0 - those files say so
-in their header and are listed in `NOTICE`. `.ref/` holds unmodified AOSP checkouts (Android 7, 8,
-and 10) used for reading only; they are gitignored and never compiled.
+Eden is MIT. Parts of it are ported from AOSP Launcher3 and from the AOSP live wallpapers, which
+are Apache 2.0 - those files say so in their header and are listed in `NOTICE`. `.ref/` holds
+unmodified AOSP Launcher3 checkouts (Android 7, 8, and 10) used for reading only; they are
+gitignored and never compiled.
+
+The wallpapers were never in Launcher3 - they live in their own AOSP repositories, and the ones
+that survive there are still RenderScript, which the Android Gradle plugin dropped in 9.0. So they
+could not have been copied even in principle: every one here was written fresh against OpenGL ES
+2.0, keeping the composition and the palette.
 
 **Is it a fork or a rewrite?** Neither word is quite honest on its own, so: it is a **rewrite that
 is also a derivative work**.

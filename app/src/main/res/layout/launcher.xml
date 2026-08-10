@@ -35,8 +35,8 @@
         android:layout_height="@dimen/dynamic_grid_hotseat_bar_height"
         android:layout_gravity="bottom" />
 
-    <app.auriel.edenlauncher.views.DeleteDropTarget
-        android:id="@+id/delete_drop_target"
+    <app.auriel.edenlauncher.views.DropTargetBar
+        android:id="@+id/drop_target_bar"
         android:layout_width="match_parent"
         android:layout_height="@dimen/drop_target_bar_height"
         android:layout_gravity="top" />

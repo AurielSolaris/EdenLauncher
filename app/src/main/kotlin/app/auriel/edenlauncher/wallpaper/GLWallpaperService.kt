@@ -62,6 +62,9 @@ abstract class GLWallpaperService : WallpaperService() {
             // Ask for offset notifications so parallax works; harmless for renderers that ignore
             // them.
             setOffsetNotificationsEnabled(true)
+            // And touches, so a wallpaper can answer a tap on empty space. Off by default in the
+            // platform, and the reason most live wallpapers feel inert.
+            setTouchEventsEnabled(true)
 
             val thread = HandlerThread("EdenWallpaper", android.os.Process.THREAD_PRIORITY_DISPLAY)
             thread.start()
@@ -101,6 +104,21 @@ abstract class GLWallpaperService : WallpaperService() {
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
             if (visible) start() else stop()
+        }
+
+        override fun onTouchEvent(event: android.view.MotionEvent) {
+            super.onTouchEvent(event)
+            if (!running) return
+            if (event.actionMasked != android.view.MotionEvent.ACTION_DOWN &&
+                event.actionMasked != android.view.MotionEvent.ACTION_MOVE
+            ) {
+                return
+            }
+            // Read on this thread and hand the values across; the MotionEvent itself is recycled
+            // and must not be touched from the GL thread.
+            val x = event.x
+            val y = event.y
+            handler?.post { renderer.onTouch(x, y) }
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {

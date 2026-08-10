@@ -45,6 +45,20 @@ class DragController(private val dragLayer: DragLayer) {
 
     private var lastScrollTime = 0L
 
+    // An armed but not yet started drag. See preparePendingDrag.
+    private var pendingView: View? = null
+    private var pendingSource: DragSource? = null
+    private var pendingInfo: ItemInfo? = null
+    private var pendingHideOriginal = true
+    private var pendingOnPromoted: (() -> Unit)? = null
+    private var pendingStartX = 0
+    private var pendingStartY = 0
+
+    private val touchSlopSquared: Int = android.view.ViewConfiguration
+        .get(dragLayer.context)
+        .scaledTouchSlop
+        .let { it * it }
+
     interface DragListener {
         fun onDragStart(info: ItemInfo?)
         fun onDragEnd()
@@ -71,6 +85,55 @@ class DragController(private val dragLayer: DragLayer) {
      * @param hideOriginal whether the source view is hidden while the drag runs. Workspace icons
      *   hide (the item is moving); drawer icons do not (the item is being copied out).
      */
+    /**
+     * Arms a drag without starting one.
+     *
+     * A long press on an icon should offer its options, not immediately rip it off the page - but
+     * long-press-and-drag is decades of muscle memory and cannot be broken to make room for a
+     * menu. So the press arms the drag and shows the popup, and the first movement past the touch
+     * slop promotes it: keep still and you get the menu, move and you get the drag you expected.
+     * This is what AOSP Launcher3 does from Android 8 onwards.
+     *
+     * @param onPromoted called if the gesture turns into a real drag, so the caller can dismiss
+     *   whatever it put on screen.
+     */
+    fun preparePendingDrag(
+        view: View,
+        source: DragSource,
+        info: ItemInfo,
+        hideOriginal: Boolean = true,
+        onPromoted: () -> Unit = {},
+    ) {
+        if (isDragging) return
+        pendingView = view
+        pendingSource = source
+        pendingInfo = info
+        pendingHideOriginal = hideOriginal
+        pendingOnPromoted = onPromoted
+        pendingStartX = dragObject.x
+        pendingStartY = dragObject.y
+    }
+
+    /** Drops an armed drag that never moved. */
+    fun clearPendingDrag() {
+        pendingView = null
+        pendingSource = null
+        pendingInfo = null
+        pendingOnPromoted = null
+    }
+
+    private fun promotePendingDrag() {
+        val view = pendingView ?: return
+        val source = pendingSource ?: return
+        val info = pendingInfo ?: return
+        val onPromoted = pendingOnPromoted
+        val hideOriginal = pendingHideOriginal
+        clearPendingDrag()
+
+        onPromoted?.invoke()
+        startDrag(view, source, info, hideOriginal)
+    }
+
     fun startDrag(
         view: View,
         source: DragSource,
@@ -119,6 +182,24 @@ class DragController(private val dragLayer: DragLayer) {
     /** Records the touch position even before a drag starts, so the lift lands under the finger. */
     fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         recordPosition(ev)
+
+        if (pendingView != null) {
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = dragObject.x - pendingStartX
+                    val dy = dragObject.y - pendingStartY
+                    if (dx * dx + dy * dy > touchSlopSquared) {
+                        promotePendingDrag()
+                        // Returning true here takes the gesture away from the child, which is what
+                        // cancels its press state and hands the rest of the stream to the drag.
+                        return true
+                    }
+                }
+
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> clearPendingDrag()
+            }
+        }
+
         return isDragging
     }
 

@@ -48,6 +48,11 @@
     <color name="wallpaper_tile_stroke">#4DA8E6C1</color>
     <color name="wallpaper_tile_scrim">#B30E1611</color>
 
+    <color name="icon_options_background">#F51B241E</color>
+    <color name="icon_options_stroke">#4DA8E6C1</color>
+
     <color name="drop_target_idle">#A0121A16</color>
     <color name="drop_target_active">#DCE05A5A</color>
+    <!-- Uninstall is the irreversible one, so it is the more alarming red of the two. -->
+    <color name="drop_target_uninstall">#E6C42B2B</color>
 </resources>
