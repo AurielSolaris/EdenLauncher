@@ -56,6 +56,127 @@ Coming next: widget hosting, then icon shapes.
 
 ---
 
+## What it looks like
+
+Every shot below is Eden 0.4.0 running on a Galaxy M31 (Android 16), captured off the device. The
+icons are themed by an icon pack the phone already had installed - nothing here is a mockup, and
+nothing was retouched.
+
+### Home screen
+
+<table>
+<tr>
+<td width="25%"><img src="art/screenshots/01-home.jpg" alt="Home screen"></td>
+<td width="25%"><img src="art/screenshots/02-overview.jpg" alt="Overview"></td>
+<td width="25%"><img src="art/screenshots/03-drag.jpg" alt="Dragging an icon"></td>
+<td width="25%"><img src="art/screenshots/04-folder.jpg" alt="An open folder"></td>
+</tr>
+<tr>
+<td><sub>Your grid, your dock, your wallpaper. The ring in the page dots marks the home page - here
+it is the middle one.</sub></td>
+<td><sub>Long-press empty space to zoom out. Each page is a card: tap the house to make it home, the
+cross to remove it.</sub></td>
+<td><sub>Pick an icon up and Remove and Uninstall appear at the top. A spare page opens at the end
+while you drag, and is swept away if you do not use it.</sub></td>
+<td><sub>Stack two icons to make a folder, then rename it to whatever you like.</sub></td>
+</tr>
+</table>
+
+### App drawer
+
+<table>
+<tr>
+<td width="25%"><img src="art/screenshots/06-drawer-vertical.jpg" alt="Vertical drawer"></td>
+<td width="25%"><img src="art/screenshots/07-drawer-horizontal.jpg" alt="Paged drawer"></td>
+<td width="25%"><img src="art/screenshots/08-drawer-search.jpg" alt="Drawer search"></td>
+<td width="25%"><img src="art/screenshots/05-icon-options.jpg" alt="Icon options"></td>
+</tr>
+<tr>
+<td><sub>Vertical scroll: one continuous grid, flung up and down.</sub></td>
+<td><sub>Horizontal pages: fixed grids with dots underneath. Same apps, your choice of
+gesture.</sub></td>
+<td><sub>Search matches anywhere in the name, not just the start - and always against the app's real
+name, so a rename can never hide it.</sub></td>
+<td><sub>Long-press anything for the same menu, on the home screen or in the drawer.</sub></td>
+</tr>
+</table>
+
+### Icons
+
+<table>
+<tr>
+<td width="25%"><img src="art/screenshots/09-settings-icons.jpg" alt="Icon pack chooser"></td>
+<td width="25%"><img src="art/screenshots/12-icon-chooser.jpg" alt="Change the icon"></td>
+<td width="25%"><img src="art/screenshots/10-icon-pack-browser.jpg" alt="In-pack icon browser"></td>
+<td width="25%"><img src="art/screenshots/11-icon-pack-search.jpg" alt="Searching the pack"></td>
+</tr>
+<tr>
+<td><sub>Every icon pack you have installed, in one dropdown. None is always the first
+entry.</sub></td>
+<td><sub>Per app: take one from the pack, hand it a picture, or put the original back.</sub></td>
+<td><sub>The whole pack as a grid - useful for the apps a pack has no entry for.</sub></td>
+<td><sub>Search it by name. Typing "phone" narrows a few thousand drawables to the handful you
+meant.</sub></td>
+</tr>
+</table>
+
+### Wallpapers
+
+<table>
+<tr>
+<td width="25%"><img src="art/screenshots/16-wallpapers-live.jpg" alt="Live wallpapers"></td>
+<td width="25%"><img src="art/screenshots/17-wallpapers-live-2.jpg" alt="More live wallpapers"></td>
+<td width="25%"><img src="art/screenshots/18-wallpaper-running.jpg" alt="Phase Beam running"></td>
+<td width="25%"><img src="art/screenshots/19-wallpaper-pictures.jpg" alt="Videos and pictures"></td>
+</tr>
+<tr>
+<td><sub>Eleven wallpapers rewritten from the AOSP originals. Every tile is a real frame rendered
+offscreen, not a running service.</sub></td>
+<td><sub>Fall, Grass, Polar Clock, Walkaround, Music Visualization - the ones Android stopped
+shipping.</sub></td>
+<td><sub>Phase Beam, actually running, before you commit to it.</sub></td>
+<td><sub>Your own video on a loop, or your own picture, alongside whatever other apps
+installed.</sub></td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td width="25%"><img src="art/screenshots/20-wallpaper-crop.jpg" alt="Positioning a wallpaper"></td>
+<td width="25%"><img src="art/screenshots/21-wallpaper-destination.jpg" alt="Where to set it"></td>
+<td width="50%"></td>
+</tr>
+<tr>
+<td><sub>Frame your own picture against the real shape of your screen. The bright area is exactly
+what you will see; drag to move, pinch to zoom.</sub></td>
+<td><sub>Home screen, lock screen, or both - and you can reframe later without hunting for the photo
+again.</sub></td>
+<td></td>
+</tr>
+</table>
+
+### Settings, and the log
+
+<table>
+<tr>
+<td width="25%"><img src="art/screenshots/13-settings-drawer.jpg" alt="Drawer and grid settings"></td>
+<td width="25%"><img src="art/screenshots/14-settings-wallpaper.jpg" alt="Wallpaper settings"></td>
+<td width="25%"><img src="art/screenshots/15-log.jpg" alt="The log"></td>
+<td width="25%"></td>
+</tr>
+<tr>
+<td><sub>Navigation style, drawer opacity and columns, then the home grid - columns, rows, dock
+size, all with an Auto.</sub></td>
+<td><sub>Wallpaper speed, the two things that could make noise or use the microphone (both off), and
+the way into the log.</sub></td>
+<td><sub>The last 48 hours of what Eden did, readable on the device and shared only if you press
+Share.</sub></td>
+<td></td>
+</tr>
+</table>
+
+---
+
 ## Status
 
 | Phase | Scope | State |
@@ -129,6 +250,7 @@ Eden/
 |-- build.gradle.kts            Root build; plugins declared, not applied
 |-- gradle/libs.versions.toml   One place for every version
 |-- gradlew, gradlew.bat        Wrapper launchers
+|-- art/                        The icon mark, and the screenshots above
 |-- .ref/                       Pinned AOSP checkouts - gitignored, read-only, never compiled
 `-- app/src/main/
     |-- AndroidManifest.xml
