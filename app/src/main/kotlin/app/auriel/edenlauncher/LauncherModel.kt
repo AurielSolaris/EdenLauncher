@@ -6,7 +6,6 @@ import android.content.pm.LauncherActivityInfo
 import android.content.pm.LauncherApps
 import android.os.UserHandle
 import android.os.UserManager
-import android.util.Log
 import app.auriel.edenlauncher.data.LauncherRepository
 import app.auriel.edenlauncher.model.AppInfo
 import app.auriel.edenlauncher.model.Containers
@@ -15,6 +14,7 @@ import app.auriel.edenlauncher.model.ItemInfo
 import app.auriel.edenlauncher.model.ItemType
 import app.auriel.edenlauncher.model.ShortcutInfo
 import app.auriel.edenlauncher.util.ComponentKey
+import app.auriel.edenlauncher.util.EdenLog
 import app.auriel.edenlauncher.util.IconCache
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -86,9 +86,67 @@ class LauncherModel(
         )
     }
 
+    /**
+     * Forgets every placed item belonging to one of [packages], folder children included.
+     *
+     * [resolveShortcutIcon] takes the opposite view on a cold load - an item whose target cannot be
+     * resolved is flagged disabled rather than deleted, because the cause might be an unmounted
+     * card or a locked work profile. Here the cause is known: `LauncherApps` said the package was
+     * removed, and it does not say that for an update or an unmount. So the row goes.
+     *
+     * @return true when something was deleted, which is the caller's cue that a rebind is not
+     *   merely a refresh of the drawer.
+     */
+    suspend fun purgePackages(packages: Set<String>): Boolean = withContext(io) {
+        if (packages.isEmpty()) return@withContext false
+
+        val data = repository.loadWorkspace()
+        var changed = false
+
+        for (item in data.workspaceItems) {
+            when (item) {
+                is FolderInfo -> {
+                    for (child in item.contents.filter { it.belongsTo(packages) }) {
+                        repository.deleteItem(child)
+                        item.contents.remove(child)
+                        changed = true
+                    }
+                    // A folder that has lost everything is not a folder any more, and leaving an
+                    // empty one behind reads as a bug rather than as a choice.
+                    if (item.contents.isEmpty()) {
+                        repository.deleteItem(item)
+                        changed = true
+                    }
+                }
+
+                is ShortcutInfo -> if (item.belongsTo(packages)) {
+                    repository.deleteItem(item)
+                    changed = true
+                }
+
+                else -> Unit
+            }
+        }
+
+        for (item in data.hotseatItems) {
+            if (item is ShortcutInfo && item.belongsTo(packages)) {
+                repository.deleteItem(item)
+                changed = true
+            }
+        }
+
+        changed
+    }
+
+    private fun ShortcutInfo.belongsTo(packages: Set<String>): Boolean =
+        targetComponent?.packageName in packages
+
     /** All launchable activities across every profile the user has, sorted by label. */
     private fun loadAllApps(): List<AppInfo> {
         activityCache.clear()
+        // Picks up a changed icon pack or a new custom icon before a single icon is resolved, so a
+        // load is never half themed.
+        iconCache.refreshIconSources()
         val apps = ArrayList<AppInfo>(196)
 
         val prefs = LauncherAppState.getInstance(context).preferences
@@ -100,7 +158,7 @@ class LauncherModel(
             val activities = try {
                 launcherApps.getActivityList(null, user)
             } catch (e: SecurityException) {
-                Log.w(TAG, "Cannot query activities for $user", e)
+                EdenLog.w(TAG, "Cannot query activities for $user", e)
                 continue
             }
 

@@ -76,6 +76,65 @@ The popup fills the drag layer and handles its own dismissal rather than using
 that opened the menu, so routing dismissal through it made the popup appear and vanish inside one
 gesture.
 
+## Icons
+
+Three sources, most specific first. `IconCache.resolve` is the whole policy:
+
+1. an icon the user picked for that one app (`icons/CustomIcons`),
+2. the icon pack in force (`icons/IconPack`),
+3. what the app ships.
+
+That order is deliberate. Choosing an icon for one app is a more specific instruction than choosing
+a pack for all of them, so switching packs must not silently undo it.
+
+Icon packs have no Android API and never did - they are a convention that grew out of ADW, in which
+an ordinary APK ships `appfilter.xml` mapping `ComponentInfo{pkg/cls}` to a drawable name. A pack
+advertises itself with whichever theme action its author's launcher used, so `icons/IconPacks`
+queries all seven common ones; checking only one loses a third of the packs a user has installed.
+`appfilter.xml` lives in assets, `res/xml`, or `res/raw` depending on the pack, and all three are
+tried.
+
+| Class | Job |
+|-------|-----|
+| `IconPack` | Parses `appfilter.xml` and `drawable.xml` for one pack, resolves a component to a drawable, and composes an unthemed icon from the pack's background, mask, overlay, and scale. |
+| `IconPacks` | Finds installed packs across every theme action. |
+| `IconPickerActivity` | The whole pack in a searchable grid, for apps a pack has no entry for. Decodes lazily as rows scroll; a pack has thousands of icons and only twenty are on screen. |
+| `CustomIcons` | Per-app PNGs under `filesDir/icons`, one file per component. Not in preferences - preferences are read whole at startup, and a dozen base64 icons in there is a dozen blobs charged against every cold start. |
+
+Icons are resolved during the load, so changing the pack changes nothing until something reloads.
+`Launcher.onResume` compares the stored pack against the one it last bound with and reloads when
+they differ - the same shape as the grid-signature check next to it, but a rebind rather than a
+recreate, because the views are still the right shape and only hold the wrong bitmaps.
+
+## Packages appearing and disappearing
+
+A `LauncherApps.Callback` registered for the whole life of the activity, not between `onStart` and
+`onStop`: an app is almost always installed with the launcher in the background, which is exactly
+the case that has to work.
+
+Events arrive in bursts, so the rebind is coalesced behind a short delay and waits out any drag in
+progress rather than deleting the view under a finger. Genuine removals accumulate across the burst
+and go to `LauncherModel.purgePackages`, which deletes the rows - including folder children, and
+the folder itself if that empties it. A cold load takes the opposite view and only flags a missing
+item disabled, because there the cause might be an unmounted card; here `LauncherApps` has said the
+package was removed, and it does not say that for an update or an unmount.
+
+## The log
+
+`util/EdenLog` writes to `filesDir/eden.log` and keeps 48 hours. Everything also goes to logcat, so
+`adb logcat` behaves exactly as before.
+
+It exists because logcat is not good enough for this app in particular: a launcher crash takes the
+home screen with it, the user's next move is a reboot, and a reboot is what clears logcat. Lines go
+into an unbounded channel drained by one coroutine, so no caller ever waits on the filesystem;
+losing the last few lines to a hard kill is the accepted cost. The crash handler is the exception
+and writes directly, because the process is about to end and the drain will not get another turn.
+
+Pruning happens on startup and whenever the file passes 512 KB: lines older than the window are
+dropped, continuation lines (stack frames, which carry no timestamp) share the fate of the line
+that introduced them, and the file is rewritten. `settings/LogViewerActivity` shows it, with Share
+through a `FileProvider` scoped to that one directory.
+
 ## Wallpapers
 
 `wallpaper/` holds a small GL engine and eleven renderers. The split that matters is
@@ -99,6 +158,24 @@ honest preview rather than the same scene at a quarter scale.
 Nothing draws while hidden. The launcher additionally sends `COMMAND_PAUSE` through
 `WallpaperManager.sendWallpaperCommand` when an opaque app drawer covers the wallpaper, because the
 system still considers it visible there.
+
+## Static wallpapers
+
+`wallpaper/picker/CropView` frames a picture against the real display shape: the bright rectangle is
+what will be visible, the dimmed surround is what gets cut, and the constraint in `constrain()`
+makes it impossible to pan far enough to leave a blank edge. Nothing allocates in its `onDraw` or
+`onTouchEvent` - the matrix and its scratch array are fields, and the scrim is four `drawRect` calls
+rather than a clip-difference that would cost a `saveLayer` every frame of a drag.
+
+Two resolutions on purpose. The preview is downsampled to at most 2048px so panning stays smooth on
+a two-core phone; the applied wallpaper is decoded again through `BitmapRegionDecoder` at the framed
+region, so zooming in does not throw away the original's detail. `CropView.normalisedCrop` returns
+fractions rather than pixels, which is what decouples the two.
+
+Eden keeps its own copy of the source picture for the same reason it keeps the transcoded video: a
+content URI belongs to another app and can be revoked. It also keeps a tile-sized copy of what it
+applied, because reading the wallpaper back out of the system needs a storage permission a launcher
+has no business holding.
 
 ## Video wallpapers
 
@@ -126,7 +203,7 @@ dependency retired in January 2025. A second backend can be added behind the int
 | Missing | Why |
 |---------|-----|
 | Widget hosting | Needs an `AppWidgetHost`, the bind-permission flow, and resize frames. The model, columns, and a placeholder tile are in place so stored widgets survive. |
-| Icon packs and custom icons | Next release. The menu row exists and is greyed, so the answer to "can it?" is visible rather than guessable. |
+| Icon shapes | Packs supply their own masks; a launcher-wide shape override on top of that is a fight between two opinions and needs a design first. |
 | Page reorder by dragging cards | Overview manages pages by badge; dragging cards to reorder is not wired yet. |
 | Overview zoom and free-scroll in `PagedView` | AOSP's oversized 2x measurement existed to support them; dropping both made measurement simpler and cheaper. |
 | Icon disk cache, app prediction, Quickstep | Later phases, or never. |

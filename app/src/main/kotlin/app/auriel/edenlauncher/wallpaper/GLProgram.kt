@@ -1,7 +1,7 @@
 package app.auriel.edenlauncher.wallpaper
 
 import android.opengl.GLES20
-import android.util.Log
+import app.auriel.edenlauncher.util.EdenLog
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -49,7 +49,7 @@ class GLProgram(vertexSource: String, fragmentSource: String) {
             val status = IntArray(1)
             GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, status, 0)
             if (status[0] == 0) {
-                Log.w(TAG, "Link failed: " + GLES20.glGetProgramInfoLog(program))
+                EdenLog.w(TAG, "Link failed: " + GLES20.glGetProgramInfoLog(program))
                 GLES20.glDeleteProgram(program)
                 return 0
             }
@@ -68,7 +68,7 @@ class GLProgram(vertexSource: String, fragmentSource: String) {
             val status = IntArray(1)
             GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, status, 0)
             if (status[0] == 0) {
-                Log.w(TAG, "Compile failed: " + GLES20.glGetShaderInfoLog(shader))
+                EdenLog.w(TAG, "Compile failed: " + GLES20.glGetShaderInfoLog(shader))
                 GLES20.glDeleteShader(shader)
                 return 0
             }

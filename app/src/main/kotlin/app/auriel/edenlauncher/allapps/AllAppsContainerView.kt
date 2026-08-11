@@ -17,6 +17,7 @@ import app.auriel.edenlauncher.R
 import app.auriel.edenlauncher.model.AppInfo
 import app.auriel.edenlauncher.settings.AppDrawerMode
 import app.auriel.edenlauncher.views.Insettable
+import app.auriel.edenlauncher.views.PageIndicatorDots
 import android.graphics.Rect
 
 /**
@@ -34,6 +35,15 @@ class AllAppsContainerView @JvmOverloads constructor(
 
     private val searchField: EditText
     private val listContainer: FrameLayout
+
+    /**
+     * Page dots for the horizontal drawer.
+     *
+     * Paging without them is the one place the drawer was worse than the workspace: no way to tell
+     * how many pages there are, or which one you are on, until you hit the end. Gone entirely in
+     * vertical mode, where there is nothing to count.
+     */
+    private val pageDots: PageIndicatorDots
 
     private var drawerView: AppDrawerView? = null
     private var allApps: List<AppInfo> = emptyList()
@@ -78,6 +88,15 @@ class AllAppsContainerView @JvmOverloads constructor(
 
         listContainer = FrameLayout(context)
         addView(listContainer, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+
+        pageDots = PageIndicatorDots(context).apply { visibility = GONE }
+        addView(
+            pageDots,
+            LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+                topMargin = resources.getDimensionPixelSize(R.dimen.all_apps_page_dots_margin)
+                bottomMargin = topMargin
+            },
+        )
     }
 
     /**
@@ -106,6 +125,15 @@ class AllAppsContainerView @JvmOverloads constructor(
                 FrameLayout.LayoutParams.MATCH_PARENT,
             ),
         )
+        // Only the paged drawer has pages to count. PageIndicatorDots hides itself when there is
+        // one page or none, so a short filtered list drops the dots on its own.
+        if (view is AppDrawerHorizontal) {
+            view.pageIndicator = pageDots
+            pageDots.visibility = VISIBLE
+        } else {
+            pageDots.visibility = GONE
+        }
+
         drawerView = view
         applyFilter()
     }

@@ -32,6 +32,53 @@
         android:name="android.hardware.sensor.accelerometer"
         android:required="false" />
 
+    <!--
+        Icon packs, and the pickers Eden hands off to.
+
+        QUERY_ALL_PACKAGES above already grants all of this, so strictly none of it is needed
+        today. It is declared anyway because it is the honest statement of what Eden actually
+        looks for: if the drawer ever stops needing the full package list, this block is what
+        keeps icon packs working after the permission is dropped.
+
+        There is no Android API for icon packs and never was - a pack advertises itself with
+        whichever theme action its author's launcher of choice used, so all the common ones are
+        listed. Missing one means silently not seeing packs the user has installed.
+    -->
+    <queries>
+        <intent>
+            <action android:name="org.adw.launcher.THEMES" />
+        </intent>
+        <intent>
+            <action android:name="org.adw.launcher.icons.ACTION_PICK_ICON" />
+        </intent>
+        <intent>
+            <action android:name="com.novalauncher.THEME" />
+        </intent>
+        <intent>
+            <action android:name="com.gau.go.launcherex.theme" />
+        </intent>
+        <intent>
+            <action android:name="com.anddoes.launcher.THEME" />
+        </intent>
+        <intent>
+            <action android:name="com.teslacoilsw.launcher.THEME" />
+        </intent>
+        <intent>
+            <action android:name="ch.deletescape.lawnchair.ICONPACK" />
+        </intent>
+
+        <!-- The document picker, for custom icons, wallpapers, and videos. -->
+        <intent>
+            <action android:name="android.intent.action.OPEN_DOCUMENT" />
+            <data android:mimeType="*/*" />
+        </intent>
+
+        <!-- Third-party live wallpapers listed in the picker. -->
+        <intent>
+            <action android:name="android.service.wallpaper.WallpaperService" />
+        </intent>
+    </queries>
+
     <application
         android:name=".EdenApplication"
         android:allowBackup="true"
@@ -103,6 +150,31 @@
         </activity>
 
         <!--
+            The last 48 hours of Eden's own log, on screen. A launcher crash takes the home screen
+            with it and the user's next move is a reboot, which is exactly what clears logcat, so
+            the log has to be readable from the device itself.
+        -->
+        <activity
+            android:name=".settings.LogViewerActivity"
+            android:exported="false"
+            android:label="@string/settings_log_title"
+            android:theme="@style/Theme.EdenSettings" />
+
+        <!--
+            Hands out a read grant for the log file and nothing else - see res/xml/log_paths.xml.
+            Not exported: only the share intent's temporary grant opens it.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.logs"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/log_paths" />
+        </provider>
+
+        <!--
             Eden's own wallpaper picker. Previews here are still frames rendered offscreen, so
             browsing never starts a wallpaper service and nothing is lost if something else takes
             the foreground while you are looking.
@@ -117,6 +189,26 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!--
+            Browses every icon in the selected pack, for the apps a pack has no entry for.
+            Reached from an icon's long-press menu only.
+        -->
+        <activity
+            android:name=".icons.IconPickerActivity"
+            android:exported="false"
+            android:label="@string/icon_picker_title"
+            android:theme="@style/Theme.EdenSettings" />
+
+        <!--
+            Framing for a static wallpaper. Reached from the picker, never on its own, so it is
+            not exported and carries no intent filter.
+        -->
+        <activity
+            android:name=".wallpaper.picker.WallpaperCropActivity"
+            android:exported="false"
+            android:label="@string/wallpaper_crop_title"
+            android:theme="@style/Theme.EdenSettings" />
 
         <!--
             Bundled live wallpapers.

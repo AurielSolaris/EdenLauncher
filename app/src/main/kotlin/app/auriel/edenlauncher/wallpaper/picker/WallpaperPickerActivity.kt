@@ -11,7 +11,6 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Bundle
 import android.service.wallpaper.WallpaperService
-import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -26,17 +25,18 @@ import app.auriel.edenlauncher.LauncherAppState
 import app.auriel.edenlauncher.R
 import app.auriel.edenlauncher.media.MediaCodecTranscoder
 import app.auriel.edenlauncher.media.VideoTranscoder
+import app.auriel.edenlauncher.util.EdenLog
 import app.auriel.edenlauncher.wallpaper.BundledWallpaper
 import app.auriel.edenlauncher.wallpaper.BundledWallpapers
 import app.auriel.edenlauncher.wallpaper.VideoWallpaperService
 import app.auriel.edenlauncher.wallpaper.WallpaperStillRenderer
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * Eden's wallpaper picker.
@@ -67,6 +67,8 @@ class WallpaperPickerActivity : Activity() {
     private lateinit var content: LinearLayout
     private var videoTile: WallpaperTileView? = null
     private var videoStatus: TextView? = null
+    private var imageTile: WallpaperTileView? = null
+    private var imageStatus: TextView? = null
 
     /** The visualiser waiting on a permission answer before it is set. */
     private var pendingVisualizerComponent: android.content.ComponentName? = null
@@ -78,6 +80,13 @@ class WallpaperPickerActivity : Activity() {
 
         renderBundledPreviews()
         loadVideoPreview()
+        loadImagePreview()
+    }
+
+    /** The crop screen finishes into the home screen, so a return here means it was cancelled. */
+    override fun onResume() {
+        super.onResume()
+        loadImagePreview()
     }
 
     override fun onDestroy() {
@@ -103,9 +112,7 @@ class WallpaperPickerActivity : Activity() {
         content.addView(videoSection())
 
         content.addView(header(getString(R.string.wallpaper_section_image)))
-        content.addView(
-            actionButton(getString(R.string.wallpaper_pick_image)) { pickImage() },
-        )
+        content.addView(imageSection())
 
         val installed = installedLiveWallpapers()
         if (installed.isNotEmpty()) {
@@ -170,6 +177,38 @@ class WallpaperPickerActivity : Activity() {
 
         column.addView(actionButton(getString(R.string.wallpaper_pick_video)) { pickVideo() })
         column.addView(note(getString(R.string.wallpaper_video_terms)))
+        return column
+    }
+
+    /**
+     * The static wallpaper, shown the same way as every other one here.
+     *
+     * A row of rendered stills next to a bare "Choose a picture" button made the static wallpaper
+     * look like the odd one out, and gave no way to see what was currently set without leaving. The
+     * tile is Eden's own copy of the crop it last applied - the system will not hand a wallpaper
+     * back without a storage permission, and a launcher asking for one to draw a thumbnail is not
+     * a trade worth making.
+     */
+    private fun imageSection(): View {
+        val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+
+        val grid = twoColumnGrid()
+        val tile = tileView(getString(R.string.wallpaper_image_current)) { reframeStillWallpaper() }
+        imageTile = tile
+        grid.addView(tile, tileParams())
+        column.addView(grid)
+
+        val status = note(
+            if (stillSourceFile()?.exists() == true) {
+                getString(R.string.wallpaper_image_reframe_hint)
+            } else {
+                getString(R.string.wallpaper_image_none)
+            },
+        )
+        imageStatus = status
+        column.addView(status)
+
+        column.addView(actionButton(getString(R.string.wallpaper_pick_image)) { pickImage() })
         return column
     }
 
@@ -242,13 +281,28 @@ class WallpaperPickerActivity : Activity() {
         }
     }
 
+    private fun loadImagePreview() {
+        val thumb = LauncherAppState.getInstance(this).preferences.stillWallpaperThumbPath
+            ?.let(::File)
+            ?.takeIf { it.exists() }
+            ?: return
+
+        scope.launch {
+            val bitmap = withContext(Dispatchers.IO) {
+                runCatching { android.graphics.BitmapFactory.decodeFile(thumb.absolutePath) }
+                    .getOrNull()
+            }
+            if (bitmap != null) imageTile?.preview = bitmap
+        }
+    }
+
     private fun firstFrameOf(file: File): Bitmap? {
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(file.absolutePath)
             retriever.getFrameAtTime(0)
         } catch (e: RuntimeException) {
-            Log.w(TAG, "Could not read a frame from ${file.path}", e)
+            EdenLog.w(TAG, "Could not read a frame from ${file.path}", e)
             null
         } finally {
             runCatching { retriever.release() }
@@ -341,7 +395,7 @@ class WallpaperPickerActivity : Activity() {
         try {
             startActivityForResult(intent, REQUEST_SET_LIVE)
         } catch (e: ActivityNotFoundException) {
-            Log.w(TAG, "No live wallpaper chooser on this device", e)
+            EdenLog.w(TAG, "No live wallpaper chooser on this device", e)
             Toast.makeText(this, R.string.wallpaper_failed, Toast.LENGTH_SHORT).show()
         }
     }
@@ -389,7 +443,7 @@ class WallpaperPickerActivity : Activity() {
         try {
             startActivityForResult(intent, requestCode)
         } catch (e: ActivityNotFoundException) {
-            Log.w(TAG, "No document picker for $mimeType", e)
+            EdenLog.w(TAG, "No document picker for $mimeType", e)
             Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT).show()
         }
     }
@@ -409,7 +463,7 @@ class WallpaperPickerActivity : Activity() {
         val uri = data?.data ?: return
         when (requestCode) {
             REQUEST_VIDEO -> importVideo(uri)
-            REQUEST_IMAGE -> applyImage(uri)
+            REQUEST_IMAGE -> importImage(uri)
         }
     }
 
@@ -443,37 +497,67 @@ class WallpaperPickerActivity : Activity() {
                 }
 
                 is VideoTranscoder.Result.Failed -> {
-                    Log.w(TAG, "Transcode failed: ${result.reason}")
+                    EdenLog.w(TAG, "Transcode failed: ${result.reason}")
                     status.text = getString(R.string.wallpaper_video_failed)
                 }
             }
         }
     }
 
-    /** Static images are set directly - no confirmation screen exists or is needed for these. */
-    private fun applyImage(source: Uri) {
+    /**
+     * Takes a copy of the picked image, then hands it to the crop screen.
+     *
+     * Copied for the same reason the video is: the picture lives in another app's storage, and a
+     * content URI can be revoked or the file moved. Owning the original is what lets the crop be
+     * adjusted later without going back to the gallery to find the photo again.
+     */
+    private fun importImage(source: Uri) {
+        val status = imageStatus
+        status?.setText(R.string.wallpaper_image_copying)
+
         scope.launch {
-            val applied = withContext(Dispatchers.IO) {
-                runCatching {
-                    contentResolver.openInputStream(source)?.use { stream ->
-                        WallpaperManager.getInstance(applicationContext).setStream(stream)
-                    }
-                }.isSuccess
+            val file = withContext(Dispatchers.IO) { copyToFiles(source) }
+            if (file == null) {
+                status?.setText(R.string.wallpaper_image_none)
+                Toast.makeText(
+                    this@WallpaperPickerActivity,
+                    R.string.wallpaper_crop_failed,
+                    Toast.LENGTH_SHORT,
+                ).show()
+                return@launch
             }
-            Toast.makeText(
-                this@WallpaperPickerActivity,
-                if (applied) R.string.wallpaper_applied else R.string.wallpaper_failed,
-                Toast.LENGTH_SHORT,
-            ).show()
-            // Same reasoning as a live wallpaper: show the user what they just did.
-            if (applied) goHome()
+            LauncherAppState.getInstance(this@WallpaperPickerActivity)
+                .preferences.stillWallpaperSourcePath = file.absolutePath
+            status?.setText(R.string.wallpaper_image_reframe_hint)
+            startActivity(WallpaperCropActivity.intentFor(this@WallpaperPickerActivity, file))
         }
+    }
+
+    private fun copyToFiles(source: Uri): File? = runCatching {
+        val target = File(filesDir, IMAGE_FILE_NAME)
+        contentResolver.openInputStream(source)?.use { input ->
+            target.outputStream().use(input::copyTo)
+        } ?: return null
+        target.takeIf { it.length() > 0 }
+    }.onFailure { EdenLog.w(TAG, "Could not copy $source", it) }.getOrNull()
+
+    /** Reopens the crop screen on the picture already chosen, so framing can be changed alone. */
+    private fun reframeStillWallpaper() {
+        val file = stillSourceFile()
+        if (file == null || !file.exists()) {
+            pickImage()
+            return
+        }
+        startActivity(WallpaperCropActivity.intentFor(this, file))
     }
 
     // ---- helpers -----------------------------------------------------------------------------
 
     private fun currentVideoFile(): File? =
         LauncherAppState.getInstance(this).preferences.videoWallpaperPath?.let(::File)
+
+    private fun stillSourceFile(): File? =
+        LauncherAppState.getInstance(this).preferences.stillWallpaperSourcePath?.let(::File)
 
     private fun installedLiveWallpapers(): List<WallpaperInfo> {
         val intent = Intent(WallpaperService.SERVICE_INTERFACE)
@@ -522,5 +606,6 @@ class WallpaperPickerActivity : Activity() {
         const val REQUEST_SET_LIVE = 3
         const val REQUEST_RECORD_AUDIO = 4
         const val VIDEO_FILE_NAME = "wallpaper_video.mp4"
+        const val IMAGE_FILE_NAME = "wallpaper_image"
     }
 }

@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Rect
 import android.util.AttributeSet
-import android.util.Log
 import android.util.LongSparseArray
 import android.view.MotionEvent
 import android.view.View
@@ -19,6 +18,7 @@ import app.auriel.edenlauncher.model.Containers
 import app.auriel.edenlauncher.model.FolderInfo
 import app.auriel.edenlauncher.model.ItemInfo
 import app.auriel.edenlauncher.model.ShortcutInfo
+import app.auriel.edenlauncher.util.EdenLog
 
 /**
  * The home screen: a [PagedView] whose pages are [CellLayout]s.
@@ -232,12 +232,12 @@ class Workspace @JvmOverloads constructor(
      */
     fun addInScreen(child: View, info: ItemInfo): Boolean {
         if (info.container != Containers.DESKTOP) {
-            Log.e(TAG, "addInScreen called with container ${info.container}")
+            EdenLog.e(TAG, "addInScreen called with container ${info.container}")
             return false
         }
 
         val page = screens.get(info.screenId) ?: run {
-            Log.e(TAG, "addInScreen: no page with id ${info.screenId}")
+            EdenLog.e(TAG, "addInScreen: no page with id ${info.screenId}")
             return false
         }
 

@@ -1,7 +1,7 @@
 package app.auriel.edenlauncher.wallpaper.live
 
 import android.media.audiofx.Visualizer
-import android.util.Log
+import app.auriel.edenlauncher.util.EdenLog
 import kotlin.math.abs
 import kotlin.math.sin
 import kotlin.random.Random
@@ -117,7 +117,7 @@ class RealAudioLevels : AudioLevels {
     } catch (e: RuntimeException) {
         // Thrown when the permission is missing, another app holds the effect, or the device has
         // no output session. All of them mean the same thing here: use the ambient source.
-        Log.w(TAG, "Visualizer unavailable, falling back to ambient", e)
+        EdenLog.w(TAG, "Visualizer unavailable, falling back to ambient", e)
         release()
         false
     }

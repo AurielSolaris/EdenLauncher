@@ -36,12 +36,23 @@ Eden gives that back. Every one of those is a setting, and the defaults are only
 - **Previews that cannot lose your place.** Every thumbnail in the picker is a still frame rendered
   offscreen, never a running service, so glancing at a wallpaper cannot be interrupted by a
   notification or a mis-tapped camera button.
+- **Position your own wallpaper.** Pick a picture and frame it against the real shape of your
+  screen - the bright area is exactly what you will see. Home screen, lock screen, or both, and you
+  can reframe later without hunting for the photo again.
+- **Icon packs**, any you have installed, read the way every other launcher reads them. Packs that
+  ship a background and mask theme the apps they have no entry for too.
+- **Any icon, for any app.** Long-press and pick from the whole pack in a searchable grid, or hand
+  it a picture. A chosen icon outranks the pack, so switching packs never silently undoes it.
 - **Rename anything**, on the home screen or in the drawer, and clear the field to get the app's own
   name back. Search still matches the original, so a rename can never hide an app from you.
+- **A drawer that keeps up.** Install, update, or uninstall an app and the launcher notices, without
+  waiting to be killed and restarted.
 - **Its own settings screen**, because a launcher lifted out of AOSP has no host app to hang
   preferences off, and no two OEM Settings apps agree on where they should live.
+- **A log you can read on the device.** The last 48 hours of what Eden did, kept locally, thrown
+  away after that, and shared only if you press Share.
 
-Coming next: icon packs and custom icons, then widgets.
+Coming next: widget hosting, then icon shapes.
 
 ---
 
@@ -52,9 +63,10 @@ Coming next: icon packs and custom icons, then widgets.
 | **1** | Foundation - project, models, database, workspace, paging, drag layer | **Done** |
 | **2** | Core launcher - loader, drag & drop, app drawer, folders, page management | **Done** (widget hosting deferred) |
 | **3** | Live wallpaper - GL engine, eleven bundled wallpapers, video wallpapers, still-frame picker | **Done** |
-| 4 | Icons - icon packs, custom icons, then widget hosting | Next |
+| **4** | Icons - icon packs, per-app icons, wallpaper cropping, live app list, on-device log | **Done** |
+| 5 | Widgets - `AppWidgetHost`, the bind-permission flow, resize frames | Next |
 
-Running on a Galaxy M31 (Android 16, API 36). Release APK is about 700 KB, with no native code.
+Running on a Galaxy M31 (Android 16, API 36). Release APK is about 800 KB, with no native code.
 
 ---
 
@@ -133,11 +145,12 @@ Eden/
         |-- dragndrop/              DragController and drop-target contracts
         |-- folder/                 Folder and FolderIcon
         |-- allapps/                The two drawer modes and their shared search
-        |-- wallpaper/              GL engine, the eleven wallpapers, video, and the picker
+        |-- wallpaper/              GL engine, the eleven wallpapers, video, picker, cropper
+        |-- icons/                  Icon packs, the in-pack browser, per-app overrides
         |-- media/                  MediaCodec video transcoder
         |-- settings/               Preferences and the settings screen
         |-- widget/                 Placeholder until hosting lands
-        `-- util/                   Icon cache, user cache, bitmap helpers
+        `-- util/                   Icon cache, user cache, bitmap helpers, the on-device log
 ```
 
 ---

@@ -123,6 +123,37 @@ class LauncherPrefs(context: Context) {
         set(value) = prefs.edit().putString(KEY_VIDEO_PATH, value).apply()
 
     /**
+     * Package name of the icon pack in use, or null for the apps' own icons.
+     *
+     * The package rather than a copy of its contents: an icon pack updates like any other app, and
+     * a launcher holding a stale snapshot of one is how themed icons end up not matching the pack
+     * the user can see installed.
+     */
+    var iconPackPackage: String?
+        get() = prefs.getString(KEY_ICON_PACK, null)
+        set(value) = prefs.edit().putString(KEY_ICON_PACK, value).apply()
+
+    /**
+     * Eden's copy of the picture behind the static wallpaper, at full resolution.
+     *
+     * Kept for the same reason as the video: a content URI belongs to whichever app the picture
+     * came from, and it can be revoked, moved, or deleted. Holding the original means the crop can
+     * be adjusted next week without going back to the gallery to find the photo again.
+     */
+    var stillWallpaperSourcePath: String?
+        get() = prefs.getString(KEY_STILL_SOURCE, null)
+        set(value) = prefs.edit().putString(KEY_STILL_SOURCE, value).apply()
+
+    /**
+     * A tile-sized copy of the crop that was actually applied, so the picker can show a still of
+     * the static wallpaper next to the still of every live one. Reading the wallpaper back from
+     * the system needs a storage permission that a launcher has no business asking for.
+     */
+    var stillWallpaperThumbPath: String?
+        get() = prefs.getString(KEY_STILL_THUMB, null)
+        set(value) = prefs.edit().putString(KEY_STILL_THUMB, value).apply()
+
+    /**
      * Whether the video wallpaper plays its sound.
      *
      * Off by default. The audio track is kept in the file either way, so this is a toggle rather
@@ -261,6 +292,9 @@ class LauncherPrefs(context: Context) {
         private const val KEY_ICON_PAD_HORIZONTAL = "icon_padding_horizontal"
         private const val KEY_ICON_LABEL_SPACING = "icon_label_spacing"
         private const val KEY_VIDEO_PATH = "video_wallpaper_path"
+        private const val KEY_ICON_PACK = "icon_pack_package"
+        private const val KEY_STILL_SOURCE = "still_wallpaper_source"
+        private const val KEY_STILL_THUMB = "still_wallpaper_thumb"
         private const val KEY_VIDEO_AUDIO = "video_wallpaper_audio"
         private const val KEY_WALLPAPER_SPEED = "live_wallpaper_speed"
         private const val KEY_VISUALIZER_REAL_AUDIO = "visualizer_real_audio"

@@ -2,7 +2,6 @@ package app.auriel.edenlauncher.data
 
 import android.content.ComponentName
 import android.content.Intent
-import android.util.Log
 import app.auriel.edenlauncher.model.Containers
 import app.auriel.edenlauncher.model.FolderInfo
 import app.auriel.edenlauncher.model.ItemInfo
@@ -10,6 +9,7 @@ import app.auriel.edenlauncher.model.ItemType
 import app.auriel.edenlauncher.model.LauncherAppWidgetInfo
 import app.auriel.edenlauncher.model.NO_ID
 import app.auriel.edenlauncher.model.ShortcutInfo
+import app.auriel.edenlauncher.util.EdenLog
 import app.auriel.edenlauncher.util.UserCache
 import app.auriel.edenlauncher.util.flatten
 import app.auriel.edenlauncher.util.toIconBitmap
@@ -25,11 +25,11 @@ private const val TAG = "ItemMapping"
  */
 fun FavoriteEntity.toItemInfo(users: UserCache): ItemInfo? {
     val type = ItemType.fromCode(itemType) ?: run {
-        Log.w(TAG, "Dropping row $id: unknown itemType $itemType")
+        EdenLog.w(TAG, "Dropping row $id: unknown itemType $itemType")
         return null
     }
     val owner = users.userFor(profileId) ?: run {
-        Log.w(TAG, "Dropping row $id: profile $profileId is gone")
+        EdenLog.w(TAG, "Dropping row $id: profile $profileId is gone")
         return null
     }
 
@@ -44,7 +44,7 @@ fun FavoriteEntity.toItemInfo(users: UserCache): ItemInfo? {
 
         ItemType.APPLICATION, ItemType.SHORTCUT, ItemType.DEEP_SHORTCUT -> {
             val parsed = intent?.let(::parseIntentOrNull) ?: run {
-                Log.w(TAG, "Dropping row $id: unparseable intent")
+                EdenLog.w(TAG, "Dropping row $id: unparseable intent")
                 return null
             }
             ShortcutInfo().also {
@@ -137,6 +137,6 @@ fun ItemInfo.isOnGrid(): Boolean =
 private fun parseIntentOrNull(uri: String): Intent? = try {
     Intent.parseUri(uri, 0)
 } catch (e: java.net.URISyntaxException) {
-    Log.w(TAG, "Malformed intent uri", e)
+    EdenLog.w(TAG, "Malformed intent uri", e)
     null
 }

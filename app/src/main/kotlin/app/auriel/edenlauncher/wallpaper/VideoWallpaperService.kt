@@ -2,9 +2,9 @@ package app.auriel.edenlauncher.wallpaper
 
 import android.media.MediaPlayer
 import android.service.wallpaper.WallpaperService
-import android.util.Log
 import android.view.SurfaceHolder
 import app.auriel.edenlauncher.settings.LauncherPrefs
+import app.auriel.edenlauncher.util.EdenLog
 import java.io.File
 
 /**
@@ -56,7 +56,7 @@ class VideoWallpaperService : WallpaperService() {
 
             val file = File(prefs.videoWallpaperPath ?: return)
             if (!file.exists()) {
-                Log.w(TAG, "Video wallpaper file is gone: ${file.path}")
+                EdenLog.w(TAG, "Video wallpaper file is gone: ${file.path}")
                 return
             }
 
@@ -69,11 +69,11 @@ class VideoWallpaperService : WallpaperService() {
                     setOnPreparedListener { if (isVisible) it.start() }
                     prepareAsync()
                 } catch (e: java.io.IOException) {
-                    Log.w(TAG, "Could not open video wallpaper", e)
+                    EdenLog.w(TAG, "Could not open video wallpaper", e)
                     release()
                     player = null
                 } catch (e: IllegalStateException) {
-                    Log.w(TAG, "MediaPlayer refused the video wallpaper", e)
+                    EdenLog.w(TAG, "MediaPlayer refused the video wallpaper", e)
                     release()
                     player = null
                 }
