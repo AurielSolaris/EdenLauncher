@@ -42,6 +42,11 @@
     <string name="settings_grid_auto">Auto</string>
     <string name="settings_hotseat_icons">Dock icons (bottom row)</string>
     <string name="settings_section_icons">Icons</string>
+    <string name="settings_icon_pack">Icon pack</string>
+    <string name="settings_icon_pack_none">None - use each app\'s own icon</string>
+    <string name="settings_icon_pack_summary">Any icon pack you have installed. Apps the pack does not cover keep their own icon, unless the pack ships a background and mask to dress them with. For those, long-press the icon and pick one from the pack by hand.</string>
+    <string name="settings_icon_pack_empty">No icon packs installed. They are ordinary apps - install one and it will appear here.</string>
+    <string name="settings_icon_pack_applied">Icon pack applied. Return to the home screen to see it.</string>
     <string name="settings_icon_size">Icon size</string>
     <string name="settings_icon_padding_vertical">Vertical spacing</string>
     <string name="settings_icon_padding_horizontal">Horizontal spacing</string>
@@ -105,6 +110,18 @@
     <string name="wallpaper_video_failed">Could not read that video</string>
     <string name="wallpaper_video_unsupported">This device cannot decode that file. Try an MP4.</string>
     <string name="wallpaper_pick_image">Choose a picture</string>
+    <string name="wallpaper_image_current">Your picture</string>
+    <string name="wallpaper_image_none">No picture chosen yet</string>
+    <string name="wallpaper_image_copying">Copying the picture</string>
+    <string name="wallpaper_image_reframe_hint">Tap the tile to reframe it without choosing again.</string>
+    <string name="wallpaper_crop_title">Position the wallpaper</string>
+    <string name="wallpaper_crop_hint">Drag to move, pinch to zoom. The bright area is exactly what you will see.</string>
+    <string name="wallpaper_crop_set">Set wallpaper</string>
+    <string name="wallpaper_crop_destination_title">Set it where?</string>
+    <string name="wallpaper_crop_both">Home and lock screen</string>
+    <string name="wallpaper_crop_home">Home screen only</string>
+    <string name="wallpaper_crop_lock">Lock screen only</string>
+    <string name="wallpaper_crop_failed">Could not read that picture</string>
     <string name="wallpaper_video_terms">Converted to 1080p at 24fps, first minute only, and kept on this device. Sound stays off until you turn it on in settings.</string>
 
     <string name="settings_section_wallpaper">Wallpaper</string>
@@ -114,13 +131,30 @@
     <string name="settings_wallpaper_speed">Live wallpaper speed</string>
     <string name="settings_wallpaper_speed_summary">Applies to Eden\'s own wallpapers. Takes effect next time you return to the home screen.</string>
 
+    <!-- Troubleshooting -->
+    <string name="settings_section_troubleshooting">Troubleshooting</string>
+    <string name="settings_log_open">Open the log</string>
+    <string name="settings_log_summary">The last 48 hours of what Eden did, kept on this device and thrown away after that. Useful for a bug report; nothing leaves the phone unless you share it.</string>
+    <string name="settings_log_title">Eden log</string>
+    <string name="settings_log_refresh">Refresh</string>
+    <string name="settings_log_share">Share</string>
+    <string name="settings_log_clear">Clear</string>
+    <string name="settings_log_empty">Nothing logged yet.</string>
+    <string name="settings_log_share_subject">Eden launcher log</string>
+
     <!-- Icon options -->
     <string name="icon_option_rename">Rename</string>
     <string name="icon_option_new_folder">Put in a new folder</string>
     <string name="icon_option_remove">Remove from home screen</string>
     <string name="icon_option_uninstall">Uninstall</string>
     <string name="icon_option_app_info">App settings</string>
-    <string name="icon_option_icon_pack">Icon and icon pack (coming in 0.4.0)</string>
+    <string name="icon_option_icon">Change the icon</string>
+    <string name="icon_choose_from_pack">Choose from the icon pack</string>
+    <string name="icon_choose_picture">Choose a picture</string>
+    <string name="icon_picker_title">Pick an icon</string>
+    <string name="icon_picker_search">Search this pack</string>
+    <string name="icon_reset">Use the default icon</string>
+    <string name="icon_set_failed">Could not read that picture</string>
     <string name="rename_dialog_title">Rename</string>
     <string name="rename_dialog_reset">Reset</string>
     <string name="rename_save">Save</string>

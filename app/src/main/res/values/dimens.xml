@@ -19,6 +19,8 @@
 
     <!-- App drawer. -->
     <dimen name="all_apps_search_padding">16dp</dimen>
+    <!-- Breathing room around the paged drawer's dots, above the gesture bar. -->
+    <dimen name="all_apps_page_dots_margin">10dp</dimen>
     <dimen name="all_apps_grid_padding_horizontal">12dp</dimen>
     <dimen name="all_apps_grid_padding_vertical">8dp</dimen>
 

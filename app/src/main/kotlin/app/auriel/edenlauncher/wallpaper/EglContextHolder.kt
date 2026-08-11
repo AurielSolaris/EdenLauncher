@@ -5,8 +5,8 @@ import android.opengl.EGLConfig
 import android.opengl.EGLContext
 import android.opengl.EGLDisplay
 import android.opengl.EGLSurface
-import android.util.Log
 import android.view.SurfaceHolder
+import app.auriel.edenlauncher.util.EdenLog
 
 /**
  * The EGL plumbing shared by the live wallpaper engine and the still-frame preview.
@@ -144,7 +144,7 @@ class EglContextHolder {
     }
 
     private fun fail(stage: String): Boolean {
-        Log.w(TAG, "EGL setup failed at $stage: 0x" + Integer.toHexString(EGL14.eglGetError()))
+        EdenLog.w(TAG, "EGL setup failed at $stage: 0x" + Integer.toHexString(EGL14.eglGetError()))
         return false
     }
 

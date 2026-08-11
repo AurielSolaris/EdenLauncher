@@ -11,7 +11,9 @@ import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
+import app.auriel.edenlauncher.LauncherAppState
 import app.auriel.edenlauncher.R
+import app.auriel.edenlauncher.icons.IconPacks
 
 /**
  * Launcher settings.
@@ -26,6 +28,9 @@ class SettingsActivity : Activity() {
 
     /** Held so the permission result can put it back in sync with what was actually granted. */
     private var audioToggle: android.widget.CheckBox? = null
+
+    /** Held so the row can show the chosen pack's name without rebuilding the screen. */
+    private var iconPackRow: View? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -89,6 +94,10 @@ class SettingsActivity : Activity() {
         )
 
         column.addView(header(getString(R.string.settings_section_icons)), spacedParams(spacing * 2))
+
+        column.addView(label(getString(R.string.settings_icon_pack)), spacedParams(spacing))
+        column.addView(iconPackChooser())
+        column.addView(summary(getString(R.string.settings_icon_pack_summary)))
 
         column.addView(label(getString(R.string.settings_icon_size)), spacedParams(spacing))
         column.addView(
@@ -157,6 +166,19 @@ class SettingsActivity : Activity() {
 
         column.addView(visualizerAudioToggle(), spacedParams(spacing))
         column.addView(videoAudioToggle(), spacedParams(spacing))
+
+        column.addView(
+            header(getString(R.string.settings_section_troubleshooting)),
+            spacedParams(spacing * 2),
+        )
+
+        column.addView(
+            actionRow(getString(R.string.settings_log_open)) {
+                startActivity(android.content.Intent(this, LogViewerActivity::class.java))
+            },
+            spacedParams(spacing),
+        )
+        column.addView(summary(getString(R.string.settings_log_summary)))
 
         column.addView(
             label(getString(R.string.settings_grid_restart_note)),
@@ -394,6 +416,78 @@ class SettingsActivity : Activity() {
             this.text = text
             setOnClickListener { onClick() }
         }
+
+    // ---- icon packs ------------------------------------------------------------------------------
+
+    /**
+     * A dropdown of every pack on the device, with the plain system icons first.
+     *
+     * A dropdown rather than a dialog because this is a value with a current state, not an action:
+     * the closed control shows what is in use, which is the question people actually come to this
+     * row to answer. "None" leads the list because it is the way back, and someone regretting a
+     * pack should not have to read past eleven entries to find it.
+     */
+    private fun iconPackChooser(): View {
+        val packs = IconPacks.installed(this)
+
+        val labels = ArrayList<String>(packs.size + 1)
+        labels.add(getString(R.string.settings_icon_pack_none))
+        packs.mapTo(labels) { it.label }
+
+        // A pack that has since been uninstalled is not in the list; forget it rather than show a
+        // name that no longer means anything.
+        val stored = prefs.iconPackPackage
+        val storedIndex = packs.indexOfFirst { it.packageName == stored }
+        if (stored != null && storedIndex < 0) prefs.iconPackPackage = null
+
+        val spinner = android.widget.Spinner(this).apply {
+            adapter = android.widget.ArrayAdapter(
+                this@SettingsActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                labels,
+            )
+            setBackgroundResource(R.drawable.settings_spinner_background)
+            setSelection(if (storedIndex >= 0) storedIndex + 1 else 0)
+
+            // Set after the initial selection, so restoring the current value is not itself
+            // treated as a change and does not clear the icon cache on every visit.
+            post {
+                onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+                    override fun onItemSelected(
+                        parent: android.widget.AdapterView<*>?,
+                        view: View?,
+                        position: Int,
+                        id: Long,
+                    ) {
+                        applyIconPack(if (position == 0) null else packs[position - 1].packageName)
+                    }
+
+                    override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+                }
+            }
+        }
+        iconPackRow = spinner
+
+        if (packs.isEmpty()) {
+            spinner.isEnabled = false
+            return LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(spinner)
+                addView(summary(getString(R.string.settings_icon_pack_empty)))
+            }
+        }
+        return spinner
+    }
+
+    private fun applyIconPack(packageName: String?) {
+        if (prefs.iconPackPackage == packageName) return
+        prefs.iconPackPackage = packageName
+        // Every cached icon was rasterised under the old answer.
+        LauncherAppState.getInstance(this).iconCache.clear()
+        android.widget.Toast
+            .makeText(this, R.string.settings_icon_pack_applied, android.widget.Toast.LENGTH_SHORT)
+            .show()
+    }
 
     // ---- small view builders ---------------------------------------------------------------------
 

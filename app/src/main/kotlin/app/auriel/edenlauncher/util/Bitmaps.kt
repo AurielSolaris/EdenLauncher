@@ -2,7 +2,6 @@ package app.auriel.edenlauncher.util
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.util.Log
 import java.io.ByteArrayOutputStream
 
 private const val TAG = "Bitmaps"
@@ -16,7 +15,7 @@ fun Bitmap.flatten(): ByteArray? {
     return try {
         if (compress(Bitmap.CompressFormat.PNG, 100, out)) out.toByteArray() else null
     } catch (e: OutOfMemoryError) {
-        Log.w(TAG, "Could not flatten ${width}x$height icon", e)
+        EdenLog.w(TAG, "Could not flatten ${width}x$height icon", e)
         null
     }
 }
@@ -25,6 +24,6 @@ fun Bitmap.flatten(): ByteArray? {
 fun ByteArray.toIconBitmap(): Bitmap? = try {
     BitmapFactory.decodeByteArray(this, 0, size)
 } catch (e: Exception) {
-    Log.w(TAG, "Could not decode stored icon", e)
+    EdenLog.w(TAG, "Could not decode stored icon", e)
     null
 }

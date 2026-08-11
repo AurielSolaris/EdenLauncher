@@ -6,12 +6,12 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
 import app.auriel.edenlauncher.data.deepShortcutIntent
 import app.auriel.edenlauncher.model.Containers
 import app.auriel.edenlauncher.model.ItemType
 import app.auriel.edenlauncher.model.ShortcutInfo
+import app.auriel.edenlauncher.util.EdenLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -142,7 +142,7 @@ class PinItemRequestActivity : Activity() {
             drawable.draw(Canvas(bitmap))
             bitmap
         } catch (e: OutOfMemoryError) {
-            Log.w(TAG, "Could not rasterise pinned shortcut icon", e)
+            EdenLog.w(TAG, "Could not rasterise pinned shortcut icon", e)
             null
         }
     }

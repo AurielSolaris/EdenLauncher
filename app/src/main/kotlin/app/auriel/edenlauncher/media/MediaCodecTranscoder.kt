@@ -8,7 +8,7 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.os.Handler
 import android.os.HandlerThread
-import android.util.Log
+import app.auriel.edenlauncher.util.EdenLog
 import app.auriel.edenlauncher.wallpaper.EglContextHolder
 import java.io.File
 import java.nio.ByteBuffer
@@ -132,13 +132,13 @@ class MediaCodecTranscoder(private val context: Context) : VideoTranscoder {
             return VideoTranscoder.Result.Success(request.target, targetWidth, targetHeight)
         } catch (e: IllegalArgumentException) {
             // MediaExtractor and MediaCodec both raise this for "I do not know this format".
-            Log.w(TAG, "Unsupported source ${request.source}", e)
+            EdenLog.w(TAG, "Unsupported source ${request.source}", e)
             return VideoTranscoder.Result.Unsupported
         } catch (e: MediaCodec.CodecException) {
-            Log.w(TAG, "Codec failed for ${request.source}", e)
+            EdenLog.w(TAG, "Codec failed for ${request.source}", e)
             return VideoTranscoder.Result.Unsupported
         } catch (e: java.io.IOException) {
-            Log.w(TAG, "IO failure transcoding ${request.source}", e)
+            EdenLog.w(TAG, "IO failure transcoding ${request.source}", e)
             return VideoTranscoder.Result.Failed(e.message ?: "could not read the file")
         } finally {
             // Ordered so nothing is torn down while something else still points at it.

@@ -7,7 +7,7 @@ import android.content.Intent
 import android.content.pm.LauncherApps
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
+import android.os.UserHandle
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
@@ -18,6 +18,9 @@ import app.auriel.edenlauncher.dragndrop.DragController
 import app.auriel.edenlauncher.dragndrop.ItemPlacementHandler
 import app.auriel.edenlauncher.folder.Folder
 import app.auriel.edenlauncher.folder.FolderIcon
+import app.auriel.edenlauncher.icons.CustomIcons
+import app.auriel.edenlauncher.icons.IconPack
+import app.auriel.edenlauncher.icons.IconPickerActivity
 import app.auriel.edenlauncher.model.AppInfo
 import app.auriel.edenlauncher.model.Containers
 import app.auriel.edenlauncher.model.FolderInfo
@@ -27,6 +30,7 @@ import app.auriel.edenlauncher.model.LauncherAppWidgetInfo
 import app.auriel.edenlauncher.model.ShortcutInfo
 import app.auriel.edenlauncher.settings.LauncherPrefs
 import app.auriel.edenlauncher.settings.SettingsActivity
+import app.auriel.edenlauncher.util.EdenLog
 import app.auriel.edenlauncher.views.BubbleTextView
 import app.auriel.edenlauncher.views.ButtonDropTarget
 import app.auriel.edenlauncher.views.CellLayout
@@ -37,8 +41,10 @@ import app.auriel.edenlauncher.wallpaper.picker.WallpaperPickerActivity
 import app.auriel.edenlauncher.widget.WidgetPlaceholderView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -66,6 +72,15 @@ class Launcher : Activity(), ItemPlacementHandler {
     private var gridSignature: String? = null
 
     /**
+     * Icon pack as of the last resume.
+     *
+     * Icons are resolved during the load, so choosing a pack in settings changes nothing until
+     * something reloads. Without this the setting appears to do nothing until the launcher happens
+     * to be killed, which is the worst possible way for a setting to behave.
+     */
+    private var iconSignature: String? = null
+
+    /**
      * Scope for work owned by this activity, cancelled in [onDestroy].
      *
      * Hand-rolled rather than pulled from `lifecycle-runtime-ktx`: one `CoroutineScope` is the
@@ -75,6 +90,52 @@ class Launcher : Activity(), ItemPlacementHandler {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private val allApps: AllAppsContainerView get() = binding.allApps
+
+    /** Packages reported removed since the last rebind, waiting to be swept out of the database. */
+    private val pendingRemovals = HashSet<String>(4)
+
+    /** The coalescing rebind. Cancelled and rescheduled while packages keep arriving. */
+    private var packageRefreshJob: Job? = null
+
+    /** The app whose icon is being chosen, held across the trip to the document picker. */
+    private var pendingIconComponent: android.content.ComponentName? = null
+
+    /**
+     * Apps appearing and disappearing while the launcher is alive.
+     *
+     * Without this the drawer only ever shows the package list as it stood when the activity was
+     * created: install something and it is missing until the launcher process is killed, uninstall
+     * something and its icon sits there pointing at nothing. Registered for the whole lifetime of
+     * the activity rather than between onStart and onStop, because installing an app almost always
+     * happens with the launcher in the background - which is exactly the case that has to work.
+     */
+    private val packageWatcher = object : LauncherApps.Callback() {
+        override fun onPackageAdded(packageName: String, user: UserHandle) =
+            onPackagesChanged(packageName, removed = false)
+
+        override fun onPackageRemoved(packageName: String, user: UserHandle) =
+            onPackagesChanged(packageName, removed = true)
+
+        /** An update, an enable, or a disable. The component list may have changed either way. */
+        override fun onPackageChanged(packageName: String, user: UserHandle) =
+            onPackagesChanged(packageName, removed = false)
+
+        override fun onPackagesAvailable(
+            packageNames: Array<out String>,
+            user: UserHandle,
+            replacing: Boolean,
+        ) = onPackagesChanged(*packageNames, removed = false)
+
+        /**
+         * Storage unmounted, not uninstalled. The apps leave the drawer, but their placed icons
+         * stay where they are and come back with the card, so nothing is purged here.
+         */
+        override fun onPackagesUnavailable(
+            packageNames: Array<out String>,
+            user: UserHandle,
+            replacing: Boolean,
+        ) = onPackagesChanged(*packageNames, removed = false)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -100,6 +161,8 @@ class Launcher : Activity(), ItemPlacementHandler {
                 OnBackInvokedDispatcher.PRIORITY_DEFAULT,
             ) { onBackRequested() }
         }
+
+        getSystemService(LauncherApps::class.java).registerCallback(packageWatcher)
 
         loadAndBind(savedInstanceState?.getInt(STATE_CURRENT_PAGE, -1) ?: -1)
     }
@@ -303,16 +366,70 @@ class Launcher : Activity(), ItemPlacementHandler {
 
     private fun loadAndBind(restoredPage: Int) {
         scope.launch {
+            val started = android.os.SystemClock.uptimeMillis()
             val results = appState.model.load()
+            bind(results, if (restoredPage >= 0) restoredPage else defaultPageIndex())
+            // The one measurement worth keeping: if the home screen is ever slow to appear, this
+            // says whether the time went into the loader or into everything after it.
+            EdenLog.i(
+                TAG,
+                "loaded ${results.allApps.size} apps, ${results.workspaceItems.size} placed, " +
+                    "${results.screenIds.size} pages in " +
+                    "${android.os.SystemClock.uptimeMillis() - started}ms",
+            )
+        }
+    }
 
-            binding.workspace.bindScreens(results.screenIds)
-            bindWorkspaceItems(results.workspaceItems)
-            bindHotseatItems(results.hotseatItems)
-            allApps.setApps(results.allApps)
+    /**
+     * Replaces every bound view from a load result.
+     *
+     * The hierarchy is rebuilt rather than patched. A package change can add, remove, rename, and
+     * re-icon any number of items at once, and rebuilding a few dozen views is cheaper than the
+     * bookkeeping needed to work out which of them actually moved - and cannot go subtly wrong.
+     */
+    private fun bind(results: LauncherModel.LoaderResults, targetPage: Int) {
+        closeFolder()
+        binding.hotseat.removeAllViews()
 
-            updateHomePageIndicator()
-            binding.workspace.setCurrentPage(
-                if (restoredPage >= 0) restoredPage else defaultPageIndex(),
+        binding.workspace.bindScreens(results.screenIds)
+        bindWorkspaceItems(results.workspaceItems)
+        bindHotseatItems(results.hotseatItems)
+        allApps.setApps(results.allApps)
+
+        updateHomePageIndicator()
+        val lastPage = (binding.workspace.childCount - 1).coerceAtLeast(0)
+        binding.workspace.setCurrentPage(targetPage.coerceIn(0, lastPage))
+    }
+
+    /**
+     * Something was installed, updated, or uninstalled.
+     *
+     * Package events arrive in bursts - a restore, or one install that pulls in three more - so the
+     * rebind is coalesced rather than run per package. Removals are accumulated across the burst
+     * because the sweep needs all of them at once.
+     */
+    private fun onPackagesChanged(vararg packages: String, removed: Boolean) {
+        for (name in packages) {
+            appState.iconCache.removePackage(name)
+            if (removed) pendingRemovals.add(name)
+        }
+
+        packageRefreshJob?.cancel()
+        packageRefreshJob = scope.launch {
+            delay(PACKAGE_REFRESH_DELAY_MS)
+
+            // Rebinding mid-drag would delete the view under the finger. The drag is the user's;
+            // the reload can wait for it.
+            while (dragController.isDragging) delay(DRAG_SETTLE_POLL_MS)
+
+            val gone = pendingRemovals.toSet()
+            pendingRemovals.clear()
+            val purged = appState.model.purgePackages(gone)
+
+            bind(appState.model.load(), binding.workspace.currentPageIndex)
+            EdenLog.i(
+                TAG,
+                "package change: removed=$gone purgedRows=$purged, drawer rebound",
             )
         }
     }
@@ -396,9 +513,10 @@ class Launcher : Activity(), ItemPlacementHandler {
         }
 
         popup
-            // Icon packs land in 0.4.0. Shown greyed rather than hidden, so the answer to "can
-            // Eden do icon packs" is visible instead of having to be guessed at.
-            .addAction(R.string.icon_option_icon_pack, enabled = false) {}
+            .addAction(
+                R.string.icon_option_icon,
+                enabled = info.intent?.component != null,
+            ) { showIconChooser(info.intent?.component) }
             .addAction(R.string.icon_option_app_info, enabled = info.intent?.component != null) {
                 showAppInfo(info)
             }
@@ -433,7 +551,10 @@ class Launcher : Activity(), ItemPlacementHandler {
                 R.string.icon_option_rename,
                 enabled = app.componentName != null,
             ) { showDrawerRenameDialog(app) }
-            .addAction(R.string.icon_option_icon_pack, enabled = false) {}
+            .addAction(
+                R.string.icon_option_icon,
+                enabled = app.componentName != null,
+            ) { showIconChooser(app.componentName) }
             .addAction(R.string.icon_option_app_info, enabled = info.intent?.component != null) {
                 showAppInfo(info)
             }
@@ -494,6 +615,115 @@ class Launcher : Activity(), ItemPlacementHandler {
             val results = appState.model.load()
             allApps.setApps(results.allApps)
         }
+    }
+
+    // ---- icons -----------------------------------------------------------------------------------
+
+    /**
+     * The per-app icon menu: pick a picture, or go back to whatever the app or the pack provides.
+     *
+     * Deliberately separate from the icon pack setting. A pack is a decision about every app at
+     * once; this is a decision about one, and it wins over the pack - which is why "use the
+     * default" has to exist as a way back rather than being implied by changing packs.
+     */
+    private fun showIconChooser(component: android.content.ComponentName?) {
+        if (component == null) return
+        pendingIconComponent = component
+
+        // "From the pack" only appears when a pack is actually in use, because otherwise there is
+        // nothing to browse and an option that opens an empty screen is worse than no option.
+        val pack = appState.preferences.iconPackPackage
+        val options = ArrayList<String>(3)
+        if (pack != null) options.add(getString(R.string.icon_choose_from_pack))
+        options.add(getString(R.string.icon_choose_picture))
+        if (CustomIcons.has(this, component)) options.add(getString(R.string.icon_reset))
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.icon_option_icon)
+            .setItems(options.toTypedArray()) { _, which ->
+                when (options[which]) {
+                    getString(R.string.icon_choose_from_pack) -> browsePackIcons(pack)
+                    getString(R.string.icon_choose_picture) -> pickCustomIcon()
+                    else -> clearCustomIcon(component)
+                }
+            }
+            .setNegativeButton(R.string.cancel) { _, _ -> pendingIconComponent = null }
+            .show()
+    }
+
+    private fun browsePackIcons(pack: String?) {
+        if (pack == null) return
+        try {
+            startActivityForResult(IconPickerActivity.intentFor(this, pack), REQUEST_PACK_ICON)
+        } catch (e: ActivityNotFoundException) {
+            EdenLog.w(TAG, "Could not open the icon browser", e)
+            pendingIconComponent = null
+        }
+    }
+
+    private fun pickCustomIcon() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("image/*")
+        try {
+            startActivityForResult(intent, REQUEST_CUSTOM_ICON)
+        } catch (e: ActivityNotFoundException) {
+            EdenLog.w(TAG, "No document picker for a custom icon", e)
+            pendingIconComponent = null
+            Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun clearCustomIcon(component: android.content.ComponentName) {
+        pendingIconComponent = null
+        CustomIcons.clear(this, component)
+        reloadForIconChange()
+    }
+
+    @Deprecated("Plain Activity has no result registry; the androidx one is not worth the dependency")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+
+        val component = pendingIconComponent
+        pendingIconComponent = null
+        if (resultCode != RESULT_OK || component == null) return
+
+        val size = appState.invariantDeviceProfile.iconBitmapSizePx
+        when (requestCode) {
+            REQUEST_CUSTOM_ICON -> {
+                val uri = data?.data ?: return
+                applyChosenIcon {
+                    CustomIcons.set(this@Launcher, component, uri, size)
+                }
+            }
+
+            REQUEST_PACK_ICON -> {
+                val drawable = data?.getStringExtra(IconPickerActivity.EXTRA_DRAWABLE) ?: return
+                val pack = appState.preferences.iconPackPackage ?: return
+                applyChosenIcon {
+                    val bitmap = IconPack(this@Launcher, pack).bitmapFor(drawable, size)
+                    bitmap != null && CustomIcons.setFromBitmap(this@Launcher, component, bitmap)
+                }
+            }
+        }
+    }
+
+    private fun applyChosenIcon(store: suspend () -> Boolean) {
+        scope.launch {
+            val stored = kotlinx.coroutines.withContext(Dispatchers.IO) { store() }
+            if (!stored) {
+                Toast.makeText(this@Launcher, R.string.icon_set_failed, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            reloadForIconChange()
+        }
+    }
+
+    /** Icons are resolved during the load, so a changed icon means one more load and one rebind. */
+    private fun reloadForIconChange() {
+        appState.iconCache.clear()
+        scope.launch { bind(appState.model.load(), binding.workspace.currentPageIndex) }
     }
 
     private fun closeIconOptions() {
@@ -609,7 +839,7 @@ class Launcher : Activity(), ItemPlacementHandler {
             getSystemService(LauncherApps::class.java)
                 .startAppDetailsActivity(component, info.user, null, null)
         }.onFailure {
-            Log.w(TAG, "Could not open app info for $component", it)
+            EdenLog.w(TAG, "Could not open app info for $component", it)
             Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT).show()
         }
     }
@@ -634,7 +864,7 @@ class Launcher : Activity(), ItemPlacementHandler {
         try {
             startActivity(intent)
         } catch (e: ActivityNotFoundException) {
-            Log.w(TAG, "No uninstaller for $packageName", e)
+            EdenLog.w(TAG, "No uninstaller for $packageName", e)
             Toast.makeText(this, R.string.uninstall_unavailable, Toast.LENGTH_SHORT).show()
         }
     }
@@ -688,16 +918,16 @@ class Launcher : Activity(), ItemPlacementHandler {
                 else -> startActivity(Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
         } catch (e: ActivityNotFoundException) {
-            Log.w(TAG, "No activity for $intent", e)
+            EdenLog.w(TAG, "No activity for $intent", e)
             Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT).show()
         } catch (e: SecurityException) {
             // Some components refuse LauncherApps.startMainActivity (notably activities of the
             // launcher's own package). A plain intent launch still works for those.
-            Log.w(TAG, "startMainActivity refused for $intent, falling back", e)
+            EdenLog.w(TAG, "startMainActivity refused for $intent, falling back", e)
             try {
                 startActivity(Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             } catch (fallback: ActivityNotFoundException) {
-                Log.w(TAG, "Fallback launch failed for $intent", fallback)
+                EdenLog.w(TAG, "Fallback launch failed for $intent", fallback)
                 Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT).show()
             }
         }
@@ -966,17 +1196,31 @@ class Launcher : Activity(), ItemPlacementHandler {
      */
     override fun onResume() {
         super.onResume()
+
         val signature = appState.preferences.gridSignature
         if (gridSignature == null) {
             gridSignature = signature
         } else if (gridSignature != signature) {
             gridSignature = signature
             appState.onConfigurationChanged()
+            // A recreate reloads everything, icons included; nothing more to do here.
             recreate()
+            return
+        }
+
+        // A changed icon pack needs a reload, not a recreate: the views are all still the right
+        // shape, they are only holding the wrong bitmaps.
+        val icons = appState.preferences.iconPackPackage.orEmpty()
+        if (iconSignature == null) {
+            iconSignature = icons
+        } else if (iconSignature != icons) {
+            iconSignature = icons
+            reloadForIconChange()
         }
     }
 
     override fun onDestroy() {
+        runCatching { getSystemService(LauncherApps::class.java).unregisterCallback(packageWatcher) }
         scope.cancel()
         super.onDestroy()
     }
@@ -1038,5 +1282,18 @@ class Launcher : Activity(), ItemPlacementHandler {
 
         /** Drawer opacity at or above which the wallpaper behind it is not worth drawing. */
         const val OPAQUE_DRAWER_THRESHOLD = 90
+
+        /**
+         * How long to let a burst of package events settle before reloading. Long enough that a
+         * restore installing forty apps costs one rebind, short enough that a single install has
+         * landed in the drawer before the user can get back to the launcher and look.
+         */
+        const val PACKAGE_REFRESH_DELAY_MS = 400L
+
+        /** How often to re-check whether a drag has finished before rebinding under it. */
+        const val DRAG_SETTLE_POLL_MS = 250L
+
+        const val REQUEST_CUSTOM_ICON = 1
+        const val REQUEST_PACK_ICON = 2
     }
 }

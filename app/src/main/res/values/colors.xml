@@ -48,6 +48,17 @@
     <color name="wallpaper_tile_stroke">#4DA8E6C1</color>
     <color name="wallpaper_tile_scrim">#B30E1611</color>
 
+    <!-- Crop screen: dark enough that the cut-away reads as cut away, light enough to still see. -->
+    <color name="wallpaper_crop_scrim">#B3060A08</color>
+    <color name="wallpaper_crop_border">#CCA8E6C1</color>
+
+    <!-- Settings dropdowns: an accented outline, so a control does not read as a heading. -->
+    <color name="settings_control_surface">#141D18</color>
+    <color name="settings_control_stroke">#66A8E6C1</color>
+
+    <!-- Icon browser tiles. -->
+    <color name="icon_picker_tile">#16211B</color>
+
     <color name="icon_options_background">#F51B241E</color>
     <color name="icon_options_stroke">#4DA8E6C1</color>
 

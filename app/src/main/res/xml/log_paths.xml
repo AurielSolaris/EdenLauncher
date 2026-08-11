@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The one directory the log provider will hand out, and nothing else. Eden's private files
+    directory holds only eden.log, so a mail client asking for the URI cannot reach anything the
+    user did not mean to send.
+-->
+<paths>
+    <files-path
+        name="logs"
+        path="." />
+</paths>
