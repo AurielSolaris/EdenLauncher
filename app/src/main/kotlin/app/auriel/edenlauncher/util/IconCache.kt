@@ -55,14 +55,20 @@ class IconCache(private val context: Context, private val iconSizePx: Int) {
      * answer. Called when the pack setting changes and at the start of every load.
      */
     fun refreshIconSources() {
-        val wanted = LauncherPrefs(context).iconPackPackage
+        val prefs = LauncherPrefs(context)
+
+        // Simple mode is v0.2.0, which had neither icon packs nor per-app icons. The stored pack
+        // and the PNG files stay exactly where they are and come back the moment it is turned off;
+        // they are simply not consulted while it is on.
+        val simple = prefs.simpleMode
+        val wanted = if (simple) null else prefs.iconPackPackage
         val current = iconPack
         if (wanted != current?.packageName) {
             iconPack = wanted?.let { IconPack(context, it) }?.takeIf { it.isUsable }
             cache.evictAll()
             EdenLog.i(TAG, "icon pack is now ${iconPack?.packageName ?: "none"} (asked for $wanted)")
         }
-        hasCustomIcons = CustomIcons.hasAny(context)
+        hasCustomIcons = !simple && CustomIcons.hasAny(context)
     }
 
     /**

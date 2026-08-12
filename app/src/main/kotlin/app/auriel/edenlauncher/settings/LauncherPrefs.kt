@@ -123,6 +123,27 @@ class LauncherPrefs(context: Context) {
         set(value) = prefs.edit().putString(KEY_VIDEO_PATH, value).apply()
 
     /**
+     * Simple mode: the launcher as it stood at v0.2.0.
+     *
+     * A grid, a drawer, and the settings for both - with the wallpapers kept, because a launcher
+     * that cannot set your wallpaper is not simpler, it is just less useful. What goes is the icon
+     * pack machinery, the per-icon menu, and widgets.
+     *
+     * Everything it hides stays exactly where it was: renames, custom icons, the chosen icon pack
+     * and placed widgets are all still in the database and the preferences, and turning this back
+     * off brings every one of them back untouched. It changes what the launcher offers, never what
+     * it has stored.
+     *
+     * What it deliberately does *not* undo is bug fixes. The drawer still notices apps being
+     * installed and removed, the paged drawer still has its dots, and the log is still reachable -
+     * none of those are features anyone chose, and a user who wants a simpler launcher has not
+     * asked for a more broken one or for one they cannot file a bug against.
+     */
+    var simpleMode: Boolean
+        get() = prefs.getBoolean(KEY_SIMPLE_MODE, false)
+        set(value) = prefs.edit().putBoolean(KEY_SIMPLE_MODE, value).apply()
+
+    /**
      * Package name of the icon pack in use, or null for the apps' own icons.
      *
      * The package rather than a copy of its contents: an icon pack updates like any other app, and
@@ -293,6 +314,7 @@ class LauncherPrefs(context: Context) {
         private const val KEY_ICON_LABEL_SPACING = "icon_label_spacing"
         private const val KEY_VIDEO_PATH = "video_wallpaper_path"
         private const val KEY_ICON_PACK = "icon_pack_package"
+        private const val KEY_SIMPLE_MODE = "simple_mode"
         private const val KEY_STILL_SOURCE = "still_wallpaper_source"
         private const val KEY_STILL_THUMB = "still_wallpaper_thumb"
         private const val KEY_VIDEO_AUDIO = "video_wallpaper_audio"

@@ -48,7 +48,18 @@ class SettingsActivity : Activity() {
             setPadding(padding, padding, padding, padding)
         }
 
-        column.addView(header(getString(R.string.settings_section_drawer)))
+        // Read once and used throughout: the screen is built in one pass, and a setting that
+        // changed halfway down would leave the page describing two different launchers.
+        val simple = prefs.simpleMode
+
+        column.addView(header(getString(R.string.settings_section_simple)))
+        column.addView(simpleModeToggle(), spacedParams(spacing))
+        column.addView(summary(getString(R.string.settings_simple_mode_summary)))
+
+        column.addView(
+            header(getString(R.string.settings_section_drawer)),
+            spacedParams(spacing * 2),
+        )
 
         column.addView(label(getString(R.string.settings_drawer_mode)), spacedParams(spacing))
         column.addView(drawerModeChooser())
@@ -95,9 +106,13 @@ class SettingsActivity : Activity() {
 
         column.addView(header(getString(R.string.settings_section_icons)), spacedParams(spacing * 2))
 
-        column.addView(label(getString(R.string.settings_icon_pack)), spacedParams(spacing))
-        column.addView(iconPackChooser())
-        column.addView(summary(getString(R.string.settings_icon_pack_summary)))
+        // Icon packs arrived in v0.4.0, so Simple mode has no use for the chooser. The sliders
+        // below stay: sizing and spacing icons was in v0.2.0 from the start.
+        if (!simple) {
+            column.addView(label(getString(R.string.settings_icon_pack)), spacedParams(spacing))
+            column.addView(iconPackChooser())
+            column.addView(summary(getString(R.string.settings_icon_pack_summary)))
+        }
 
         column.addView(label(getString(R.string.settings_icon_size)), spacedParams(spacing))
         column.addView(
@@ -356,6 +371,26 @@ class SettingsActivity : Activity() {
      * first tries to draw. A permission dialog that appears while you are looking at your home
      * screen, with no obvious cause, is how apps train people to deny things.
      */
+    /**
+     * The way in and out of Simple mode.
+     *
+     * Always the first thing on this screen, and never hidden by itself - a toggle that removes
+     * settings has to stay visible in the state it creates, or there is no way back. Flipping it
+     * rebuilds the screen immediately so the user can see what just changed rather than being told
+     * to go and look.
+     */
+    private fun simpleModeToggle(): View = android.widget.CheckBox(this).apply {
+        text = getString(R.string.settings_simple_mode)
+        setTextColor(getColor(R.color.settings_text))
+        textSize = 16f
+        isChecked = prefs.simpleMode
+        setOnCheckedChangeListener { _, checked ->
+            if (checked == prefs.simpleMode) return@setOnCheckedChangeListener
+            prefs.simpleMode = checked
+            setContentView(buildContentView())
+        }
+    }
+
     private fun visualizerAudioToggle(): View {
         val toggle = android.widget.CheckBox(this).apply {
             text = getString(R.string.settings_visualizer_real_audio)

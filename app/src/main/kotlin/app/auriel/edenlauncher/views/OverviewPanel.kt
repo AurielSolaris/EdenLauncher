@@ -33,6 +33,9 @@ class OverviewPanel @JvmOverloads constructor(
     var isOpen: Boolean = false
         private set
 
+    /** Held so Simple mode can take it out; v0.2.0 hosted no widgets and offered no way in. */
+    private val widgetsButton: View
+
     init {
         orientation = HORIZONTAL
         gravity = Gravity.CENTER
@@ -45,8 +48,14 @@ class OverviewPanel @JvmOverloads constructor(
 
         addView(button(Glyph.ADD, R.string.overview_add_page) { onAddPageClick?.invoke() })
         addView(button(Glyph.WALLPAPER, R.string.overview_wallpaper) { onWallpaperClick?.invoke() })
-        addView(button(Glyph.WIDGETS, R.string.overview_widgets) { onWidgetsClick?.invoke() })
+        widgetsButton = button(Glyph.WIDGETS, R.string.overview_widgets) { onWidgetsClick?.invoke() }
+        addView(widgetsButton)
         addView(button(Glyph.SETTINGS, R.string.overview_settings) { onSettingsClick?.invoke() })
+    }
+
+    /** The remaining buttons re-centre themselves, so the bar does not end up with a gap in it. */
+    fun setWidgetsVisible(visible: Boolean) {
+        widgetsButton.visibility = if (visible) VISIBLE else GONE
     }
 
     private fun button(glyph: Glyph, labelRes: Int, onClick: () -> Unit): View {

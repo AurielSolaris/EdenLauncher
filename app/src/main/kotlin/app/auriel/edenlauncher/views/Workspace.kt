@@ -557,7 +557,11 @@ class Workspace @JvmOverloads constructor(
         fun viewInfo(view: View?): ItemInfo? = when (view) {
             is BubbleTextView -> view.itemInfo
             is FolderIcon -> view.folderInfo
-            else -> null
+
+            // A hosted widget is a view the launcher does not own and cannot give a typed field
+            // to - it comes from the provider's RemoteViews through AppWidgetHost. It carries its
+            // model object as the tag instead, which is how AOSP does it for every workspace child.
+            else -> view?.tag as? ItemInfo
         }
     }
 }
