@@ -21,6 +21,14 @@ interface AppDrawerView {
     /** Returns the drawer to its start (top of the list, or the first page). */
     fun resetScroll()
 
+    /**
+     * True when a further downward drag has nothing left to scroll.
+     *
+     * The container asks before it takes a gesture over for pull-to-close. Answering true while
+     * the list can still scroll would dismiss the drawer in the middle of a fling.
+     */
+    val isScrolledToTop: Boolean
+
     var onAppClick: ((AppInfo) -> Unit)?
 
     /** Long press starts a drag out of the drawer onto the workspace. */

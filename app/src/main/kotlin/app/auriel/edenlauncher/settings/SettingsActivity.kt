@@ -104,6 +104,8 @@ class SettingsActivity : Activity() {
             ) { prefs.hotseatIcons = it },
         )
 
+        column.addView(rotationToggle(), spacedParams(spacing))
+
         column.addView(header(getString(R.string.settings_section_icons)), spacedParams(spacing * 2))
 
         // Icon packs arrived in v0.4.0, so Simple mode has no use for the chooser. The sliders
@@ -194,6 +196,17 @@ class SettingsActivity : Activity() {
             spacedParams(spacing),
         )
         column.addView(summary(getString(R.string.settings_log_summary)))
+
+        column.addView(
+            header(getString(R.string.settings_section_about)),
+            spacedParams(spacing * 2),
+        )
+        column.addView(
+            actionRow(getString(R.string.about_open)) {
+                startActivity(android.content.Intent(this, AboutActivity::class.java))
+            },
+            spacedParams(spacing),
+        )
 
         column.addView(
             label(getString(R.string.settings_grid_restart_note)),
@@ -388,6 +401,25 @@ class SettingsActivity : Activity() {
             if (checked == prefs.simpleMode) return@setOnCheckedChangeListener
             prefs.simpleMode = checked
             setContentView(buildContentView())
+        }
+    }
+
+    /**
+     * Whether the home screen follows the device's rotation. Off by default; see
+     * [LauncherPrefs.allowRotation] for why, and why the lock is `nosensor` rather than `portrait`.
+     */
+    private fun rotationToggle(): View {
+        val toggle = android.widget.CheckBox(this).apply {
+            text = getString(R.string.settings_allow_rotation)
+            setTextColor(getColor(R.color.settings_text))
+            textSize = 16f
+            isChecked = prefs.allowRotation
+            setOnCheckedChangeListener { _, checked -> prefs.allowRotation = checked }
+        }
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(toggle)
+            addView(summary(getString(R.string.settings_allow_rotation_summary)))
         }
     }
 

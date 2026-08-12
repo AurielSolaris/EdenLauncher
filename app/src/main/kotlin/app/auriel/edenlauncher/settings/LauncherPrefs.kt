@@ -123,6 +123,22 @@ class LauncherPrefs(context: Context) {
         set(value) = prefs.edit().putString(KEY_VIDEO_PATH, value).apply()
 
     /**
+     * Whether the home screen follows the device's rotation.
+     *
+     * Off, which is what almost everyone wants from a launcher: the grid reflows, the dock moves to
+     * the edge, and it happens because the phone was put down at an angle rather than because
+     * anyone asked. Every app you open from here still rotates as it always did - this is the home
+     * screen's own behaviour, not a device setting.
+     *
+     * Locked with `nosensor` rather than `portrait`, which pins the activity to the device's
+     * *natural* orientation. That is portrait on a phone and landscape on some tablets and
+     * foldables, so this does not force a tablet to be sideways-wrong.
+     */
+    var allowRotation: Boolean
+        get() = prefs.getBoolean(KEY_ALLOW_ROTATION, false)
+        set(value) = prefs.edit().putBoolean(KEY_ALLOW_ROTATION, value).apply()
+
+    /**
      * Simple mode: the launcher as it stood at v0.2.0.
      *
      * A grid, a drawer, and the settings for both - with the wallpapers kept, because a launcher
@@ -315,6 +331,7 @@ class LauncherPrefs(context: Context) {
         private const val KEY_VIDEO_PATH = "video_wallpaper_path"
         private const val KEY_ICON_PACK = "icon_pack_package"
         private const val KEY_SIMPLE_MODE = "simple_mode"
+        private const val KEY_ALLOW_ROTATION = "allow_rotation"
         private const val KEY_STILL_SOURCE = "still_wallpaper_source"
         private const val KEY_STILL_THUMB = "still_wallpaper_thumb"
         private const val KEY_VIDEO_AUDIO = "video_wallpaper_audio"

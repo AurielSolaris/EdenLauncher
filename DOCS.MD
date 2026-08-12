@@ -149,6 +149,42 @@ against.
 The toggle is the first row on the settings screen and is never hidden by itself. A switch that
 removes settings has to remain visible in the state it creates.
 
+## Orientation
+
+The home activity is `nosensor`, and the setting is applied again in `onCreate` and `onResume` with
+`setRequestedOrientation` so it takes effect on the way back from settings rather than the next time
+the process is killed.
+
+`nosensor` rather than `portrait` on purpose: it pins the activity to the device's *natural*
+orientation, which is portrait on a phone and landscape on some tablets and foldables. Hard-coding
+portrait would force those to be sideways-wrong. None of the landscape code is gone - the setting
+can turn rotation back on, and a tablet's natural orientation may be landscape to begin with, so
+`DeviceProfile.profileFor(isLandscape)` still matters. `configChanges` already covers orientation,
+so nothing recreates either way.
+
+The wallpaper crop screen is locked too, for a different reason: it frames a picture against the
+real shape of the screen, so rotating mid-crop would change the target aspect underneath the user.
+
+One caveat worth knowing rather than fighting: from Android 16, fixed orientations are ignored on
+large screens - `setRequestedOrientation` included. On a tablet or an unfolded foldable the setting
+therefore does nothing, and the launcher rotates. That is the platform's call and the right one;
+the lock is aimed at phones, which is where an accidental rotation is annoying.
+
+## Destroying things
+
+Two rules, both from the project's fourth rule - never lose the user's arrangement.
+
+Deleting a page asks first, and says how many items are about to go with it, because "delete this
+page" and "delete these nine things" are different decisions. An empty page goes without asking;
+there is nothing to lose and the prompt would be noise.
+
+Deleting a page also has to sweep the *contents* of any folder on it. A folder's own row sits on
+the page and is caught by the page delete, but its children are not - their container is the
+folder's id, not the desktop - so they used to survive the page that held them and become rows
+pointing at a parent that does not exist. `LauncherDao.deleteOrphans` runs on every load and clears
+any that already exist: self-healing rather than a migration, because there is no schema change to
+hang a `Migration` off and databases in the wild already contain them.
+
 ## Icons
 
 Three sources, most specific first. `IconCache.resolve` is the whole policy:
