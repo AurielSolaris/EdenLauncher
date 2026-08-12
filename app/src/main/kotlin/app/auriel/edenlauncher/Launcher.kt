@@ -178,6 +178,8 @@ class Launcher : Activity(), ItemPlacementHandler {
         binding = LauncherBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        applyRotationSetting()
+
         widgetHost = LauncherAppWidgetHost(this)
         // A provider being installed, updated, or removed changes what a placed widget can render.
         // The same coalesced rebind the package watcher uses is exactly right here too.
@@ -240,6 +242,9 @@ class Launcher : Activity(), ItemPlacementHandler {
 
     private fun setUpWorkspace() {
         binding.workspace.pageIndicator = binding.pageIndicator
+        // The dots already say which page you are on; tapping one is the obvious way to ask for a
+        // different one, and it is a long way across five pages otherwise.
+        binding.pageIndicator.onMarkerSelected = { index -> binding.workspace.snapToPage(index) }
         binding.workspace.onSwipeUp = { openAllApps() }
         // Long press on empty space zooms the workspace out, as AOSP Launcher3 does. Page
         // management happens on the cards themselves rather than in a list of words.
@@ -250,7 +255,7 @@ class Launcher : Activity(), ItemPlacementHandler {
             exitOverview()
         }
         binding.workspace.onOverviewSetHome = { screenId -> setHomePage(screenId) }
-        binding.workspace.onOverviewRemovePage = { screenId -> removePage(screenId) }
+        binding.workspace.onOverviewRemovePage = { screenId -> confirmRemovePage(screenId) }
 
         binding.overviewPanel.onAddPageClick = { addPage() }
         binding.overviewPanel.onWallpaperClick = { openWallpaperPicker() }
@@ -329,6 +334,29 @@ class Launcher : Activity(), ItemPlacementHandler {
     }
 
     /** Deletes a page, with everything on it. The last page is never removed. */
+    /**
+     * The X on an overview card.
+     *
+     * An empty page goes straight away - there is nothing to lose and asking would be noise. A page
+     * with things on it asks first, because the rule this project holds itself to is that the
+     * user's arrangement is never lost, and one mis-tap on a small badge is not consent to destroy
+     * a screenful of work. AOSP asks too.
+     */
+    private fun confirmRemovePage(screenId: Long) {
+        val occupied = binding.workspace.getScreenWithId(screenId)?.childCount ?: 0
+        if (occupied == 0) {
+            removePage(screenId)
+            return
+        }
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.remove_page_title)
+            .setMessage(resources.getQuantityString(R.plurals.remove_page_message, occupied, occupied))
+            .setPositiveButton(R.string.remove_page_confirm) { _, _ -> removePage(screenId) }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
     private fun removePage(screenId: Long) {
         val workspace = binding.workspace
         if (!workspace.removeScreen(screenId)) {
@@ -385,6 +413,10 @@ class Launcher : Activity(), ItemPlacementHandler {
             )
             showDrawerIconOptions(view, app)
         }
+
+        // Pulling the drawer down past the top of the list closes it, which is the same gesture
+        // that opened it, run backwards.
+        allApps.onDismissRequested = { closeAllApps() }
 
         val prefs = appState.preferences
         prefs.appDrawerModeFlow()
@@ -694,6 +726,23 @@ class Launcher : Activity(), ItemPlacementHandler {
         binding.dragLayer.activeResizeFrame = null
         binding.dragLayer.onTouchOutsideResizeFrame = null
         return true
+    }
+
+    /**
+     * Locks the home screen to the device's natural orientation unless the user asked otherwise.
+     *
+     * Applied here rather than only in the manifest so the setting takes effect on the way back
+     * from settings instead of the next time the process is killed. `nosensor` rather than
+     * `portrait`: it pins the activity to whatever the device's natural orientation is, which is
+     * landscape on some tablets and foldables, so this never forces one to be sideways-wrong.
+     */
+    private fun applyRotationSetting() {
+        val wanted = if (appState.preferences.allowRotation) {
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        } else {
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_NOSENSOR
+        }
+        if (requestedOrientation != wanted) requestedOrientation = wanted
     }
 
     private fun currentDeviceProfile() = appState.invariantDeviceProfile.profileFor(
@@ -1503,6 +1552,8 @@ class Launcher : Activity(), ItemPlacementHandler {
      */
     override fun onResume() {
         super.onResume()
+
+        applyRotationSetting()
 
         val signature = appState.preferences.gridSignature
         if (gridSignature == null) {

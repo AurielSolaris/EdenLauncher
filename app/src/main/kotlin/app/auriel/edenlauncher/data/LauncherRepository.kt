@@ -4,8 +4,10 @@ import android.util.LongSparseArray
 import app.auriel.edenlauncher.model.Containers
 import app.auriel.edenlauncher.model.FolderInfo
 import app.auriel.edenlauncher.model.ItemInfo
+import app.auriel.edenlauncher.model.ItemType
 import app.auriel.edenlauncher.model.NO_ID
 import app.auriel.edenlauncher.model.ShortcutInfo
+import app.auriel.edenlauncher.util.EdenLog
 import app.auriel.edenlauncher.util.UserCache
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -38,6 +40,14 @@ class LauncherRepository(
 
     suspend fun loadWorkspace(): WorkspaceData = withContext(io) {
         val screens = dao.loadScreens().map { it.id }
+
+        // Clear anything whose parent folder is gone before reading. Deleting a page used to take
+        // the folder's own row and leave its children behind, and those rows are unreachable: they
+        // are not on a page, not in the dock, and the folder they name does not exist. Left alone
+        // they are carried forward forever.
+        val orphans = dao.deleteOrphans(ROOT_CONTAINERS, ItemType.FOLDER.code)
+        if (orphans > 0) EdenLog.i(TAG, "swept $orphans row(s) whose folder no longer exists")
+
         val rows = dao.loadFavorites()
 
         // Rows are converted once. Folder children are held aside because a child can be read
@@ -101,7 +111,7 @@ class LauncherRepository(
     }
 
     suspend fun removeScreen(screenId: Long) = withContext(io) {
-        dao.deleteScreenWithContents(screenId, Containers.DESKTOP)
+        dao.deleteScreenWithContents(screenId, Containers.DESKTOP, ItemType.FOLDER.code)
     }
 
     /** Persists a new page order; [screenIds] is the full list, left to right. */
@@ -127,4 +137,11 @@ class LauncherRepository(
     suspend fun isEmpty(): Boolean = withContext(io) { dao.favoriteCount() == 0 }
 
     private fun now(): Long = System.currentTimeMillis()
+
+    private companion object {
+        const val TAG = "LauncherRepository"
+
+        /** Containers that are not rows: the desktop and the dock. Everything else is a folder. */
+        val ROOT_CONTAINERS = listOf(Containers.DESKTOP, Containers.HOTSEAT)
+    }
 }

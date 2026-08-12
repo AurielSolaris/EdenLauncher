@@ -58,6 +58,11 @@ Eden gives that back. Every one of those is a setting, and the defaults are only
 - **A simple mode, if you want less.** One switch turns Eden back into what it was at v0.2.0 - a
   home screen, a drawer, wallpapers, and the settings for them. It puts things away; it never
   deletes them, and everything comes back the moment you switch it off.
+- **A home screen that stays where you put it.** No swinging sideways because you set the phone down
+  at an angle. Apps you open still rotate exactly as they did, and there is a setting if you
+  disagree.
+- **Nothing is destroyed on one tap.** Deleting a page says how many things are on it and waits for
+  an answer; an empty page still goes without ceremony.
 
 Coming next: icon shapes, then notification dots.
 
@@ -192,9 +197,10 @@ Share.</sub></td>
 | **2** | Core launcher - loader, drag & drop, app drawer, folders, page management | **Done** |
 | **3** | Live wallpaper - GL engine, eleven bundled wallpapers, video wallpapers, still-frame picker | **Done** |
 | **4** | Icons - icon packs, per-app icons, wallpaper cropping, live app list, on-device log | **Done** |
-| 5 | Widgets - `AppWidgetHost`, the bind flow, the picker, resize frames | **Done**; simple mode and the rest of 0.5.0 in progress |
+| **5** | Widgets - `AppWidgetHost`, the bind flow, the picker, resize frames - plus simple mode | **Done** |
+| 6 | Icon shapes, notification dots, page reorder by dragging cards | Next |
 
-Running on a Galaxy M31 (Android 16, API 36). Release APK is about 850 KB, with no native code.
+Running on a Galaxy M31 (Android 16, API 36). Release APK is about 830 KB, with no native code.
 
 ---
 

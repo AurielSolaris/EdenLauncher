@@ -58,6 +58,19 @@ abstract class LauncherDao {
     @Query("DELETE FROM favorites WHERE container = :container AND screen = :screen")
     abstract suspend fun deleteScreenContents(container: Long, screen: Long)
 
+    @Query(
+        "SELECT _id FROM favorites " +
+            "WHERE container = :container AND screen = :screen AND itemType = :folderItemType",
+    )
+    abstract suspend fun folderIdsOnScreen(
+        container: Long,
+        screen: Long,
+        folderItemType: Int,
+    ): List<Long>
+
+    @Query("DELETE FROM favorites WHERE container IN (:containerIds)")
+    abstract suspend fun deleteItemsInContainers(containerIds: List<Long>)
+
     @Query("SELECT COUNT(*) FROM favorites")
     abstract suspend fun favoriteCount(): Int
 
@@ -88,10 +101,39 @@ abstract class LauncherDao {
         insertScreens(screens)
     }
 
-    /** Removes a page and everything on it. */
+    /**
+     * Removes a page and everything on it, folders included.
+     *
+     * The folder children have to go first and by hand. A folder's own row sits on the page and is
+     * swept by [deleteScreenContents], but its children do not - their container is the folder's
+     * id, not the desktop, so they survive the page that held them and become rows pointing at a
+     * parent that no longer exists. Invisible, permanent, and carried forward forever.
+     */
     @Transaction
-    open suspend fun deleteScreenWithContents(screenId: Long, desktopContainer: Long) {
+    open suspend fun deleteScreenWithContents(
+        screenId: Long,
+        desktopContainer: Long,
+        folderItemType: Int,
+    ) {
+        val folderIds = folderIdsOnScreen(desktopContainer, screenId, folderItemType)
+        if (folderIds.isNotEmpty()) deleteItemsInContainers(folderIds)
         deleteScreenContents(desktopContainer, screenId)
         deleteScreen(screenId)
     }
+
+    /**
+     * Deletes rows whose container no longer exists.
+     *
+     * Self-healing rather than a migration: databases in the wild already contain orphans left by
+     * the page delete above, and there is no schema change to hang a `Migration` off. Cheap enough
+     * to run on every load - one indexed scan - and it is the only thing that will ever clear them.
+     */
+    @Query(
+        """
+        DELETE FROM favorites
+        WHERE container NOT IN (:rootContainers)
+          AND container NOT IN (SELECT _id FROM favorites WHERE itemType = :folderItemType)
+        """,
+    )
+    abstract suspend fun deleteOrphans(rootContainers: List<Long>, folderItemType: Int): Int
 }

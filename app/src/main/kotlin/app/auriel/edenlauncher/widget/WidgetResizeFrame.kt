@@ -1,5 +1,6 @@
 package app.auriel.edenlauncher.widget
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -157,6 +158,8 @@ class WidgetResizeFrame(context: Context) : View(context) {
         canvas.drawCircle(x, y, handleRadius, handleStroke)
     }
 
+    // Handles are dragged, never tapped; there is no click here for a service to perform.
+    @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val widget = this.widget ?: return false
 

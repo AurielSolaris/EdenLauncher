@@ -29,6 +29,8 @@
     <string name="widget_bind_failed">Could not add that widget</string>
     <string name="widget_no_space">No room on the home screen for that widget</string>
     <string name="last_page_kept">The last page cannot be removed</string>
+    <string name="remove_page_title">Delete this page?</string>
+    <string name="remove_page_confirm">Delete</string>
     <string name="home_page_set">This page is now your home page</string>
 
     <string name="options_wallpaper">Wallpaper</string>
@@ -157,6 +159,23 @@
     <string name="settings_log_empty">Nothing logged yet.</string>
     <string name="settings_log_share_subject">Eden launcher log</string>
 
+    <!-- About -->
+    <string name="about_title">About Eden</string>
+    <string name="about_open">About Eden</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_what_it_is">A revival of the classic AOSP Launcher3, rewritten in Kotlin, for people who are tired of being told how their own home screen works.\n\nThe grid, the drawer, the home page, the icons and the wallpaper are all settings here, and the defaults are only defaults. Nothing is sent anywhere: Eden has no network code at all.</string>
+    <string name="about_section_licence">Licence</string>
+    <string name="about_licence">Eden is MIT licensed.\n\nParts of it are ported from AOSP Launcher3 and from the AOSP live wallpapers, which are Apache 2.0. Those files say so in their headers and are listed in NOTICE, alongside the class each one derives from.\n\nThe wallpapers were never part of Launcher3 and could not have been copied even in principle - the surviving AOSP versions are RenderScript, which the Android Gradle plugin dropped. Every one here was written fresh against OpenGL ES 2.0, keeping the composition and the palette.</string>
+    <string name="about_section_contact">Bugs and ideas</string>
+    <string name="about_contact">Attach the log if you are reporting something that went wrong - Settings, Troubleshooting, Open the log, then Share. It stays on the device until you do.</string>
+    <string name="about_email">debadityamalakar@gmail.com</string>
+    <string name="about_email_action">Send an email</string>
+    <string name="about_email_subject">Eden</string>
+
+    <string name="settings_section_about">About</string>
+    <string name="settings_allow_rotation">Rotate the home screen</string>
+    <string name="settings_allow_rotation_summary">Off. A launcher that turns sideways because you put the phone down at an angle is rarely what anyone wanted. Apps you open still rotate exactly as they did.</string>
+
     <!-- Icon options -->
     <string name="icon_option_rename">Rename</string>
     <string name="icon_option_new_folder">Put in a new folder</string>
@@ -177,4 +196,13 @@
     <string name="uninstall_drop_target_label">Uninstall</string>
     <string name="uninstall_unavailable">That cannot be uninstalled</string>
     <string name="folder_created">Folder created</string>
+
+    <!--
+        Deleting a page takes everything on it, so the count is the whole point of the question -
+        "delete this page" and "delete these nine things" are different decisions.
+    -->
+    <plurals name="remove_page_message">
+        <item quantity="one">One item is on this page. It will be removed with it.</item>
+        <item quantity="other">%1$d items are on this page. They will be removed with it.</item>
+    </plurals>
 </resources>

@@ -57,6 +57,9 @@ class WidgetPickerActivity : Activity() {
     private var previewWidth = 0
     private var previewHeight = 0
 
+    /** Shown only when the phone provides no widgets at all. */
+    private var emptyNote: TextView? = null
+
     private val previews = object : LruCache<ComponentName, Bitmap>(CACHE_BYTES) {
         override fun sizeOf(key: ComponentName, value: Bitmap): Int = value.allocationByteCount
     }
@@ -97,6 +100,15 @@ class WidgetPickerActivity : Activity() {
             setPadding(padding, 0, padding, padding / 2)
         }
 
+        val empty = TextView(this).apply {
+            text = getString(R.string.widget_picker_empty)
+            setTextColor(getColor(R.color.settings_text_secondary))
+            textSize = SUMMARY_SP
+            setPadding(padding, padding, padding, padding)
+            visibility = View.GONE
+        }
+        emptyNote = empty
+
         adapter = RowAdapter()
         val list = RecyclerView(this).apply {
             layoutManager = LinearLayoutManager(this@WidgetPickerActivity)
@@ -111,6 +123,7 @@ class WidgetPickerActivity : Activity() {
             fitsSystemWindows = true
             addView(heading, matchWidth())
             addView(note, matchWidth())
+            addView(empty, matchWidth())
             addView(list, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         }
     }
@@ -124,6 +137,9 @@ class WidgetPickerActivity : Activity() {
         scope.launch {
             val rows = withContext(Dispatchers.IO) { buildRows() }
             adapter.submit(rows)
+            // A phone with no widget providers at all is unusual but real, and an empty screen with
+            // a heading on it looks like something failed to load rather than like an answer.
+            emptyNote?.visibility = if (rows.isEmpty()) View.VISIBLE else View.GONE
         }
     }
 

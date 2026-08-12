@@ -55,4 +55,12 @@ class AppDrawerVertical(context: Context) : AppDrawerView {
     override fun submitApps(apps: List<AppInfo>) = adapter.submit(apps)
 
     override fun resetScroll() = recyclerView.scrollToPosition(0)
+
+    /**
+     * Asked of the RecyclerView itself rather than tracked alongside it. The list is the authority
+     * on whether it has anywhere left to go, and a shadow copy of that would be one more thing to
+     * keep in step through filters, rebinds and configuration changes.
+     */
+    override val isScrolledToTop: Boolean
+        get() = !recyclerView.canScrollVertically(-1)
 }

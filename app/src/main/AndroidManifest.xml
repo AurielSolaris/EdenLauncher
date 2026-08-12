@@ -106,7 +106,7 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:resizeableActivity="true"
-            android:screenOrientation="unspecified"
+            android:screenOrientation="nosensor"
             android:stateNotNeeded="true"
             android:theme="@style/Theme.Eden"
             android:windowSoftInputMode="adjustPan">
@@ -227,6 +227,17 @@
             android:name=".wallpaper.picker.WallpaperCropActivity"
             android:exported="false"
             android:label="@string/wallpaper_crop_title"
+            android:screenOrientation="nosensor"
+            android:theme="@style/Theme.EdenSettings" />
+
+        <!--
+            What Eden is, what version it is, and what it owes to AOSP. Locked to one orientation
+            for the same reason the crop screen is: nothing here rewards being rotated.
+        -->
+        <activity
+            android:name=".settings.AboutActivity"
+            android:exported="false"
+            android:label="@string/about_title"
             android:theme="@style/Theme.EdenSettings" />
 
         <!--

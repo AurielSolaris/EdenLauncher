@@ -1,5 +1,6 @@
 package app.auriel.edenlauncher.widget
 
+import android.annotation.SuppressLint
 import android.appwidget.AppWidgetHostView
 import android.content.Context
 import android.graphics.Canvas
@@ -74,6 +75,9 @@ class LauncherAppWidgetHostView(context: Context) : AppWidgetHostView(context) {
      * drag controller, which reads them off the drag layer, so nothing further is done with them -
      * but they must be consumed, or the gesture is handed back to the widget mid-drag.
      */
+    // The claimed events belong to the drag, and the widget's own children keep their clicks and
+    // their accessibility actions - this view never becomes a button in front of them.
+    @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean = claimed
 
     override fun cancelLongPress() {

@@ -77,6 +77,13 @@ class AppDrawerHorizontal(context: Context) : PagedView(context), AppDrawerView 
 
     override fun resetScroll() = setCurrentPage(0)
 
+    /**
+     * Always false: pull-to-close is a vertical gesture, and this drawer's whole gesture vocabulary
+     * is horizontal. Offering it here would mean a downward drag doing something different in the
+     * two modes for no reason the user chose.
+     */
+    override val isScrolledToTop: Boolean get() = false
+
     override fun getEdgeVerticalPosition(out: IntArray) {
         out[0] = 0
         out[1] = height
