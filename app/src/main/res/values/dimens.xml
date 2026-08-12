@@ -38,6 +38,9 @@
     <dimen name="icon_options_row_padding">12dp</dimen>
     <dimen name="icon_options_corner_radius">16dp</dimen>
 
+    <!-- Widget picker. Big enough to tell two widgets from the same app apart. -->
+    <dimen name="widget_picker_preview_size">72dp</dimen>
+
     <!-- Open folder panel. -->
     <dimen name="folder_corner_radius">20dp</dimen>
     <dimen name="folder_padding">12dp</dimen>

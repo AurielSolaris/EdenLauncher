@@ -187,10 +187,26 @@ class DragLayer @JvmOverloads constructor(
     /** Set by the launcher once the controller exists; null before then. */
     var dragController: DragController? = null
 
+    /**
+     * The widget resize handles, while they are showing, and what to do when the user touches
+     * anywhere else.
+     *
+     * Handled here rather than by the frame itself because the frame only covers the widget: a tap
+     * meant to dismiss it lands on the workspace, which the frame never sees. AOSP's DragLayer
+     * does the same check for the same reason.
+     */
+    var activeResizeFrame: View? = null
+    var onTouchOutsideResizeFrame: (() -> Unit)? = null
+
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         if (ev.action == MotionEvent.ACTION_UP || ev.action == MotionEvent.ACTION_CANCEL) {
             touchCompleteListener?.onTouchComplete()
             touchCompleteListener = null
+        }
+
+        val frame = activeResizeFrame
+        if (frame != null && ev.action == MotionEvent.ACTION_DOWN && !isEventOverView(frame, ev)) {
+            onTouchOutsideResizeFrame?.invoke()
         }
         // Once a drag is running the drag layer owns the gesture, and children are cancelled.
         if (dragController?.onInterceptTouchEvent(ev) == true) return true

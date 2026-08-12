@@ -16,7 +16,18 @@
     <string name="pin_shortcut_added">Added to home screen</string>
     <string name="pin_no_space">No room on the home screen</string>
     <string name="pin_widget_unsupported">Widgets are not supported yet</string>
-    <string name="widget_placeholder">Widget (not hosted yet)</string>
+    <string name="widget_placeholder">Widget (app not installed)</string>
+
+    <!-- Widgets -->
+    <string name="widget_picker_title">Widgets</string>
+    <string name="widget_picker_summary">Sizes are in cells of your grid, so the same widget takes more room on a smaller grid.</string>
+    <string name="widget_picker_size">%1$d x %2$d cells</string>
+    <string name="widget_picker_too_big">Too large for your grid</string>
+    <string name="widget_picker_empty">No app on this phone provides a widget.</string>
+    <string name="widget_option_resize">Resize</string>
+    <string name="widget_error">This widget would not load</string>
+    <string name="widget_bind_failed">Could not add that widget</string>
+    <string name="widget_no_space">No room on the home screen for that widget</string>
     <string name="last_page_kept">The last page cannot be removed</string>
     <string name="home_page_set">This page is now your home page</string>
 
@@ -41,6 +52,10 @@
     <string name="settings_grid_rows">Grid rows</string>
     <string name="settings_grid_auto">Auto</string>
     <string name="settings_hotseat_icons">Dock icons (bottom row)</string>
+    <string name="settings_section_simple">Simple mode</string>
+    <string name="settings_simple_mode">Use the simple launcher</string>
+    <string name="settings_simple_mode_summary">Eden as it was at v0.2.0: a home screen, a drawer, wallpapers, and the settings for them. Icon packs, per-app icons, the long-press icon menu and widgets are put away. Nothing is deleted - your renames, chosen icons and placed widgets are kept and come straight back when you turn this off.</string>
+
     <string name="settings_section_icons">Icons</string>
     <string name="settings_icon_pack">Icon pack</string>
     <string name="settings_icon_pack_none">None - use each app\'s own icon</string>

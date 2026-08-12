@@ -94,18 +94,47 @@ class Folder @JvmOverloads constructor(
         addView(
             content,
             LayoutParams(
-                idp.numFolderColumns * folderCellSize(),
-                idp.numFolderRows * folderCellSize(),
+                idp.numFolderColumns * folderCellWidth(),
+                idp.numFolderRows * folderCellHeight(),
             ),
         )
     }
 
-    private fun folderCellSize(): Int {
-        val landscape = resources.configuration.orientation ==
-            android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        val profile = LauncherAppState.getInstance(context).invariantDeviceProfile.profileFor(landscape)
-        return profile.cellWidthPx.coerceAtLeast(profile.iconSizePx + profile.iconDrawablePaddingPx * 2)
+    private fun profile() = LauncherAppState.getInstance(context).invariantDeviceProfile.profileFor(
+        resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE,
+    )
+
+    private fun folderCellWidth(): Int {
+        val profile = profile()
+        val prefs = LauncherAppState.getInstance(context).preferences
+        return profile.cellWidthPx
+            .coerceAtLeast(profile.iconSizePx + dp(prefs.iconPaddingHorizontalDp) * 2)
     }
+
+    /**
+     * A folder cell is as tall as the icon it holds *plus its label*, not square.
+     *
+     * It used to be square, sized from the workspace cell's width. A cell is wider than an icon but
+     * taller still - the height has to carry the icon, the gap under it, one line of label, and the
+     * vertical padding the user can set - so squaring it off left no room for the label at all.
+     * Every app in an open folder showed as bare artwork with no name, while the same icon on the
+     * home screen was labelled.
+     *
+     * Measured from the same numbers [app.auriel.edenlauncher.views.BubbleTextView] lays itself out
+     * with rather than from `cellHeightPx`, because that figure leaves out the icon padding
+     * preference and the workspace only gets away with it by dividing the page height between rows.
+     */
+    private fun folderCellHeight(): Int {
+        val profile = profile()
+        val prefs = LauncherAppState.getInstance(context).preferences
+        val labelHeight = (profile.iconTextSizePx * LABEL_LINE_FACTOR).toInt()
+        return profile.iconSizePx +
+            dp(prefs.iconLabelSpacingDp) +
+            labelHeight +
+            dp(prefs.iconPaddingVerticalDp) * 2
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     // ---- open / close ---------------------------------------------------------------------------
 
@@ -183,6 +212,14 @@ class Folder @JvmOverloads constructor(
         content.removeAllViews()
         val info = folderInfo ?: return
 
+        // The panel is as tall as it needs to be, not as tall as the folder could ever get. A
+        // folder holding three apps used to open a full-height grid of empty cells under them.
+        val idp = LauncherAppState.getInstance(context).invariantDeviceProfile
+        val columns = idp.numFolderColumns
+        val rows = ((info.contents.size + columns - 1) / columns).coerceIn(1, idp.numFolderRows)
+        content.setGridSize(columns, rows)
+        content.layoutParams = LayoutParams(columns * folderCellWidth(), rows * folderCellHeight())
+
         for ((index, item) in info.contents.withIndex()) {
             if (!content.findVacantCell(tmpCell)) break
             val icon = BubbleTextView(context).apply {
@@ -245,6 +282,9 @@ class Folder @JvmOverloads constructor(
     }
 
     private companion object {
+        /** One line with descenders, the same figure `DeviceProfile` measures a label with. */
+        const val LABEL_LINE_FACTOR = 1.5f
+
         const val OPEN_START_SCALE = 0.85f
         const val OPEN_DURATION_MS = 160L
         const val CLOSE_DURATION_MS = 120L

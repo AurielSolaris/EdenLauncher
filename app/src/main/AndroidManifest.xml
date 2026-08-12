@@ -77,6 +77,15 @@
         <intent>
             <action android:name="android.service.wallpaper.WallpaperService" />
         </intent>
+
+        <!--
+            Widget providers, for the picker. A provider is an ordinary broadcast receiver with
+            this action, and package visibility applies to it like anything else - without this a
+            phone full of widgets can look as though it has none.
+        -->
+        <intent>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent>
     </queries>
 
     <application
@@ -198,6 +207,16 @@
             android:name=".icons.IconPickerActivity"
             android:exported="false"
             android:label="@string/icon_picker_title"
+            android:theme="@style/Theme.EdenSettings" />
+
+        <!--
+            Every widget the phone provides, grouped by app, with the size each one will take on
+            this user's grid. Reached from overview, so it is not exported.
+        -->
+        <activity
+            android:name=".widget.WidgetPickerActivity"
+            android:exported="false"
+            android:label="@string/widget_picker_title"
             android:theme="@style/Theme.EdenSettings" />
 
         <!--

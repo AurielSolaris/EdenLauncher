@@ -76,6 +76,79 @@ The popup fills the drag layer and handles its own dismissal rather than using
 that opened the menu, so routing dismissal through it made the popup appear and vanish inside one
 gesture.
 
+## Widgets
+
+There is no single call for "add this widget". `widget/WidgetBinding` walks the three steps a
+launcher has to do itself:
+
+1. **Allocate** an id from Eden's own `AppWidgetHost`. Until something is bound to it, it is a
+   number.
+2. **Bind** it to a provider. `bindAppWidgetIdIfAllowed` succeeds silently for a provider the user
+   has already approved and returns false otherwise - which is not an error, it is the ordinary
+   answer, and the next move is the system's `ACTION_APPWIDGET_BIND` prompt.
+3. **Configure**, if the provider declared a configuration activity. Started through the host,
+   because a configuration activity is usually not exported and only the host may launch it.
+
+Any of the three can be cancelled, and every path that gives up calls
+`LauncherAppWidgetHost.releaseWidgetId`. An id that is allocated and then forgotten is never
+reclaimed and its provider goes on being told a widget exists.
+
+`startListening` / `stopListening` are tied to `onStart` / `onStop`, not to the activity's whole
+life: a launcher sitting behind another app has nothing to draw updates into, and a provider woken
+to push RemoteViews at a screen nobody is looking at is exactly the background cost this project
+avoids. Both are guarded - AOSP documents them as able to throw while the system server restarts.
+
+**Sizes.** A provider states its size two incompatible ways. Since API 31 it can say what it wants
+in cells (`targetCellWidth`), which needs no translation. Everything older states pixels, and
+`WidgetSizes` works back from that against *this user's* grid - so the same widget is 4x1 on one
+grid and 3x1 on another, which is correct. The picker shows the result per entry and refuses to
+offer a provider that cannot fit at all, rather than letting a user through an id allocation and a
+permission prompt to be told at the end that there is nowhere to put it.
+
+**Touch.** A widget is a foreign view hierarchy that consumes everything.
+`LauncherAppWidgetHostView` detects the long press above the widget's own children and sends them a
+cancel when it fires. Without that, a widget containing a button can never be picked up.
+
+**Resizing.** `WidgetResizeFrame` lives in the drag layer, not the page, so handles can be drawn
+outside the widget's cell without being clipped. Resizing snaps to whole cells - a widget that can
+sit between cells is a widget that can overlap an icon - and every candidate size is tested against
+the page's occupancy before it is applied. The widget's own cells are released from that occupancy
+while the frame is up, or every candidate overlapping where it already is would be rejected.
+
+**No migration was needed.** `favorites` has carried `appWidgetId`, `appWidgetProvider`, `spanX`,
+`spanY`, and `restored` since Phase 1. Widgets stored before hosting existed come back bound.
+
+`Workspace.viewInfo` falls back to the view's tag. A host view belongs to the provider and cannot be
+given a typed field, so it carries its `ItemInfo` as a tag - which is what AOSP does for every
+workspace child. Without it `findViewFor` cannot locate a widget, and resize, remove and move all
+silently do nothing.
+
+## Simple mode
+
+One switch in settings turns Eden back into what it was at v0.2.0. The scope was taken from the
+0.2.0 tag rather than from memory: a home screen with pages, both drawer styles with search, drag
+and drop including stacking two icons into a folder, and settings for the drawer, the grid and icon
+sizing. Wallpapers are kept on top of that, because a launcher that cannot set your wallpaper is
+not simpler, only less useful.
+
+| Turned off | Why |
+|------------|-----|
+| Icon packs and per-app icons | v0.4.0. `IconCache.refreshIconSources` stops consulting either. |
+| The long-press icon menu | v0.3.0. A long press arms a drag and nothing else, as it did in 0.2.0. Remove and Uninstall are still on the drop targets, where 0.2.0 had them. |
+| Widgets | The overview button is hidden. Hosting itself stays on, so a widget placed earlier still renders rather than turning into a placeholder. |
+
+Nothing is deleted. Renames, custom icon files, the chosen pack and placed widgets all stay in the
+database and the preferences, and turning the switch off brings them back untouched - it changes
+what the launcher offers, never what it has stored.
+
+Two things it deliberately does **not** undo, because they are fixes rather than features: the
+drawer still notices apps being installed and removed, and the log is still reachable. A user who
+wants a simpler launcher has not asked for a more broken one, or for one they cannot file a bug
+against.
+
+The toggle is the first row on the settings screen and is never hidden by itself. A switch that
+removes settings has to remain visible in the state it creates.
+
 ## Icons
 
 Three sources, most specific first. `IconCache.resolve` is the whole policy:
@@ -202,7 +275,8 @@ dependency retired in January 2025. A second backend can be added behind the int
 
 | Missing | Why |
 |---------|-----|
-| Widget hosting | Needs an `AppWidgetHost`, the bind-permission flow, and resize frames. The model, columns, and a placeholder tile are in place so stored widgets survive. |
+| Work-profile widgets | Binding one goes through a different call; it belongs with proper multi-profile support rather than smuggled into the picker. |
+| Search in the widget picker | Fine at sixty widgets, not at three hundred. |
 | Icon shapes | Packs supply their own masks; a launcher-wide shape override on top of that is a fight between two opinions and needs a design first. |
 | Page reorder by dragging cards | Overview manages pages by badge; dragging cards to reorder is not wired yet. |
 | Overview zoom and free-scroll in `PagedView` | AOSP's oversized 2x measurement existed to support them; dropping both made measurement simpler and cheaper. |

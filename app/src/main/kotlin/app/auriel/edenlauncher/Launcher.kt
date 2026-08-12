@@ -38,7 +38,12 @@ import app.auriel.edenlauncher.views.IconOptionsPopup
 import app.auriel.edenlauncher.views.Workspace
 import app.auriel.edenlauncher.wallpaper.GLWallpaperService
 import app.auriel.edenlauncher.wallpaper.picker.WallpaperPickerActivity
+import app.auriel.edenlauncher.widget.LauncherAppWidgetHost
+import app.auriel.edenlauncher.widget.WidgetBinding
+import app.auriel.edenlauncher.widget.WidgetPickerActivity
 import app.auriel.edenlauncher.widget.WidgetPlaceholderView
+import app.auriel.edenlauncher.widget.WidgetResizeFrame
+import app.auriel.edenlauncher.widget.WidgetSizes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -101,6 +106,27 @@ class Launcher : Activity(), ItemPlacementHandler {
     private var pendingIconComponent: android.content.ComponentName? = null
 
     /**
+     * Eden's end of the widget contract.
+     *
+     * Created here rather than in [LauncherAppState] on purpose: a host that outlives the activity
+     * outlives the views its widgets draw into, and the system keeps pushing updates at it.
+     */
+    private lateinit var widgetHost: LauncherAppWidgetHost
+
+    /** The resize handles, when a widget is being resized. At most one at a time. */
+    private var resizeFrame: WidgetResizeFrame? = null
+
+    /**
+     * The widget id allocated for an add that has not finished yet.
+     *
+     * Adding a widget is three trips through other activities - the picker, possibly the system's
+     * bind prompt, possibly the provider's own configuration screen - and the id has to survive all
+     * of them. Any path that gives up releases it; an id that is allocated and then forgotten is
+     * never reclaimed by the system.
+     */
+    private var pendingWidgetId = LauncherAppWidgetInfo.NO_WIDGET_ID
+
+    /**
      * Apps appearing and disappearing while the launcher is alive.
      *
      * Without this the drawer only ever shows the package list as it stood when the activity was
@@ -152,6 +178,11 @@ class Launcher : Activity(), ItemPlacementHandler {
         binding = LauncherBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        widgetHost = LauncherAppWidgetHost(this)
+        // A provider being installed, updated, or removed changes what a placed widget can render.
+        // The same coalesced rebind the package watcher uses is exactly right here too.
+        widgetHost.onProvidersChanged = { onPackagesChanged(removed = false) }
+
         setUpDragAndDrop()
         setUpWorkspace()
         setUpAllApps()
@@ -191,6 +222,7 @@ class Launcher : Activity(), ItemPlacementHandler {
             override fun onDragStart(info: ItemInfo?) {
                 exitOverview()
                 closeIconOptions()
+                closeResizeFrame()
                 binding.dropTargetBar.setDragInProgress(true, info)
                 binding.workspace.addExtraEmptyScreen()
             }
@@ -222,9 +254,7 @@ class Launcher : Activity(), ItemPlacementHandler {
 
         binding.overviewPanel.onAddPageClick = { addPage() }
         binding.overviewPanel.onWallpaperClick = { openWallpaperPicker() }
-        binding.overviewPanel.onWidgetsClick = {
-            Toast.makeText(this, R.string.pin_widget_unsupported, Toast.LENGTH_SHORT).show()
-        }
+        binding.overviewPanel.onWidgetsClick = { openWidgetPicker() }
         binding.overviewPanel.onSettingsClick = {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
@@ -236,6 +266,9 @@ class Launcher : Activity(), ItemPlacementHandler {
         if (binding.workspace.isInOverview) return
         closeFolder()
         closeAllApps()
+        // Read on the way in rather than once at startup, so the setting takes effect the next time
+        // overview is opened instead of the next time the launcher is killed.
+        binding.overviewPanel.setWidgetsVisible(!appState.preferences.simpleMode)
         binding.workspace.bindOverviewCallbacks(appState.preferences.defaultScreenId)
         binding.workspace.enterOverview()
         binding.overviewPanel.open()
@@ -470,12 +503,202 @@ class Launcher : Activity(), ItemPlacementHandler {
             setOnLongClickListener { startDragFromWorkspace(this, item) }
         }
 
-        // Widgets are modelled and stored, but hosting is not implemented yet. A placeholder tile
-        // keeps the item visible and its database row intact until hosting lands.
-        is LauncherAppWidgetInfo -> WidgetPlaceholderView(this).apply { applyFrom(item) }
+        is LauncherAppWidgetInfo -> createWidgetView(item)
 
         else -> null
     }
+
+    // ---- widgets ---------------------------------------------------------------------------------
+
+    /**
+     * A hosted widget, or the placeholder when it cannot be hosted right now.
+     *
+     * The placeholder is not dead code: a widget whose provider has been uninstalled, or whose id
+     * was never bound, still has a database row and a place on the grid. Drawing nothing there
+     * would look like the launcher had lost it, and the user would have no way to remove something
+     * they cannot see.
+     */
+    private fun createWidgetView(item: LauncherAppWidgetInfo): View {
+        val providerInfo = if (item.appWidgetId >= 0) {
+            WidgetBinding.providerFor(this, item.appWidgetId)
+        } else {
+            null
+        }
+
+        if (providerInfo == null) {
+            return WidgetPlaceholderView(this).apply {
+                applyFrom(item)
+                tag = item
+                setOnLongClickListener { startDragFromWorkspace(this, item) }
+            }
+        }
+
+        return widgetHost.createView(this, item.appWidgetId, providerInfo).apply {
+            setAppWidget(item.appWidgetId, providerInfo)
+            // The launcher's own views carry their model object in a typed field; a host view is
+            // the provider's, so the tag is the only place to put it. See Workspace.viewInfo.
+            tag = item
+            setOnLongClickListener { startDragFromWorkspace(this, item) }
+            // The host view is measured by the cell, and the provider needs telling in dp what it
+            // was actually given, or it picks a layout for the wrong size.
+            post {
+                if (width > 0 && height > 0) {
+                    WidgetSizes.applySize(this, this@Launcher, width, height)
+                }
+            }
+        }
+    }
+
+    private fun openWidgetPicker() {
+        exitOverview()
+        try {
+            startActivityForResult(WidgetPickerActivity.intentFor(this), REQUEST_PICK_WIDGET)
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * Step two of adding a widget: an id is allocated and bound, either silently or by asking.
+     *
+     * The id is allocated before the bind because binding is what an id is *for* - there is no way
+     * to ask the system whether a provider would be allowed without having one to offer it.
+     */
+    private fun bindWidget(provider: android.content.ComponentName) {
+        val appWidgetId = widgetHost.allocateAppWidgetId()
+        pendingWidgetId = appWidgetId
+
+        if (WidgetBinding.bindIfAllowed(this, appWidgetId, provider)) {
+            configureOrPlaceWidget(appWidgetId)
+            return
+        }
+
+        try {
+            startActivityForResult(
+                WidgetBinding.bindPermissionIntent(appWidgetId, provider),
+                REQUEST_BIND_WIDGET,
+            )
+        } catch (e: ActivityNotFoundException) {
+            EdenLog.w(TAG, "no activity for the widget bind prompt", e)
+            abandonPendingWidget()
+            Toast.makeText(this, R.string.widget_bind_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Step three: the provider's own settings screen, if it has one. Otherwise place it. */
+    private fun configureOrPlaceWidget(appWidgetId: Int) {
+        val info = WidgetBinding.providerFor(this, appWidgetId)
+        val configuring = WidgetBinding.startConfigureIfNeeded(
+            activity = this,
+            host = widgetHost,
+            appWidgetId = appWidgetId,
+            info = info,
+            requestCode = REQUEST_CONFIGURE_WIDGET,
+        )
+        if (!configuring) placeWidget(appWidgetId)
+    }
+
+    /**
+     * The widget is bound and configured; find it a home.
+     *
+     * A widget that will not fit anywhere is refused *here* rather than earlier, because "anywhere"
+     * includes pages the user has not filled yet and the picker cannot know about those.
+     */
+    private fun placeWidget(appWidgetId: Int) {
+        pendingWidgetId = LauncherAppWidgetInfo.NO_WIDGET_ID
+
+        val providerInfo = WidgetBinding.providerFor(this, appWidgetId) ?: run {
+            widgetHost.releaseWidgetId(appWidgetId)
+            Toast.makeText(this, R.string.widget_bind_failed, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val profile = currentDeviceProfile()
+        val span = WidgetSizes.defaultSpan(providerInfo, profile)
+        val cell = IntArray(2)
+        val screenId = binding.workspace.findFreeCell(cell, span[0], span[1])
+        if (screenId < 0) {
+            widgetHost.releaseWidgetId(appWidgetId)
+            Toast.makeText(this, R.string.widget_no_space, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val info = LauncherAppWidgetInfo(appWidgetId, providerInfo.provider).apply {
+            container = Containers.DESKTOP
+            this.screenId = screenId
+            cellX = cell[0]
+            cellY = cell[1]
+            spanX = span[0]
+            spanY = span[1]
+            title = providerInfo.loadLabel(packageManager)
+        }
+
+        scope.launch {
+            info.id = appState.repository.addItem(info)
+            val view = createWidgetView(info)
+            if (binding.workspace.addInScreen(view, info)) {
+                binding.workspace.snapToPage(binding.workspace.getScreenIndex(screenId))
+            } else {
+                rehomeItem(info, view)
+            }
+            EdenLog.i(TAG, "placed widget ${providerInfo.provider} as ${span[0]}x${span[1]}")
+        }
+    }
+
+    /** Gives an allocated id back when the add is cancelled or fails part-way. */
+    private fun abandonPendingWidget() {
+        if (pendingWidgetId != LauncherAppWidgetInfo.NO_WIDGET_ID) {
+            widgetHost.releaseWidgetId(pendingWidgetId)
+            pendingWidgetId = LauncherAppWidgetInfo.NO_WIDGET_ID
+        }
+    }
+
+    /** Puts the resize handles around a placed widget. */
+    private fun startWidgetResize(info: LauncherAppWidgetInfo) {
+        val view = findViewFor(info) ?: return
+        val page = view.parent as? CellLayout ?: return
+        val providerInfo = WidgetBinding.providerFor(this, info.appWidgetId) ?: return
+
+        closeIconOptions()
+        val profile = currentDeviceProfile()
+        val frame = resizeFrame ?: WidgetResizeFrame(this).also { resizeFrame = it }
+        frame.attach(
+            dragLayer = binding.dragLayer,
+            widget = view,
+            page = page,
+            minSpan = WidgetSizes.minSpan(providerInfo, profile),
+            maxSpan = WidgetSizes.maxSpan(providerInfo, profile),
+        ) { cellX, cellY, spanX, spanY ->
+            info.cellX = cellX
+            info.cellY = cellY
+            info.spanX = spanX
+            info.spanY = spanY
+            WidgetSizes.applySize(
+                view as android.appwidget.AppWidgetHostView,
+                this,
+                spanX * page.cellWidth,
+                spanY * page.cellHeight,
+            )
+            scope.launch { appState.repository.updateItem(info) }
+        }
+
+        binding.dragLayer.activeResizeFrame = frame
+        binding.dragLayer.onTouchOutsideResizeFrame = { closeResizeFrame() }
+    }
+
+    /** Takes the resize handles away. Returns true when there were any, so back can consume it. */
+    private fun closeResizeFrame(): Boolean {
+        val frame = resizeFrame ?: return false
+        if (!frame.isAttached) return false
+        frame.detach()
+        binding.dragLayer.activeResizeFrame = null
+        binding.dragLayer.onTouchOutsideResizeFrame = null
+        return true
+    }
+
+    private fun currentDeviceProfile() = appState.invariantDeviceProfile.profileFor(
+        resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE,
+    )
 
     /**
      * A long press on a workspace icon.
@@ -502,6 +725,12 @@ class Launcher : Activity(), ItemPlacementHandler {
     // ---- icon options ----------------------------------------------------------------------------
 
     private fun showIconOptions(anchor: View, info: ItemInfo) {
+        // v0.2.0 had no per-icon menu at all: a long press armed a drag and that was the whole
+        // gesture. Everything this menu offers arrived later, so in Simple mode it does not appear
+        // and the press goes straight to dragging. Removing and uninstalling are still there, on
+        // the drop targets at the top of the screen, which is where 0.2.0 had them.
+        if (appState.preferences.simpleMode) return
+
         val uninstallablePackage = ButtonDropTarget.uninstallablePackage(info)
 
         val popup = IconOptionsPopup(this)
@@ -510,6 +739,16 @@ class Launcher : Activity(), ItemPlacementHandler {
         // Folders already are folders; only a loose icon can be put into a new one.
         if (info is ShortcutInfo && info !is FolderInfo) {
             popup.addAction(R.string.icon_option_new_folder) { createFolderAround(info) }
+        }
+
+        // Only offered for a widget whose provider says it can be resized at all. A fixed-size
+        // widget with handles that refuse to move is worse than no handles.
+        if (info is LauncherAppWidgetInfo) {
+            val providerInfo = WidgetBinding.providerFor(this, info.appWidgetId)
+            popup.addAction(
+                R.string.widget_option_resize,
+                enabled = providerInfo != null && WidgetSizes.isResizable(providerInfo),
+            ) { startWidgetResize(info) }
         }
 
         popup
@@ -544,6 +783,10 @@ class Launcher : Activity(), ItemPlacementHandler {
      * Uninstall is here because this is where people go looking for it.
      */
     private fun showDrawerIconOptions(anchor: View, app: AppInfo) {
+        // Same reasoning as the workspace menu: v0.2.0 had none, so Simple mode has none, and a
+        // long press in the drawer goes straight to dragging the app out onto the home screen.
+        if (appState.preferences.simpleMode) return
+
         val info = app.toShortcut()
 
         val popup = IconOptionsPopup(this)
@@ -684,6 +927,49 @@ class Launcher : Activity(), ItemPlacementHandler {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
+
+        // The widget flow owns its own state and has to see a cancel as clearly as a success:
+        // every abandoned step leaves an allocated id behind if nobody releases it.
+        when (requestCode) {
+            REQUEST_PICK_WIDGET -> {
+                // The typed overload is API 33; this has to keep working on 29.
+                @Suppress("DEPRECATION")
+                val provider = data
+                    ?.getParcelableExtra<android.content.ComponentName>(
+                        WidgetPickerActivity.EXTRA_PROVIDER,
+                    )
+                if (resultCode == RESULT_OK && provider != null) bindWidget(provider)
+                return
+            }
+
+            REQUEST_BIND_WIDGET -> {
+                val appWidgetId = data?.getIntExtra(
+                    android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID,
+                    pendingWidgetId,
+                ) ?: pendingWidgetId
+                if (resultCode == RESULT_OK) {
+                    configureOrPlaceWidget(appWidgetId)
+                } else {
+                    // The user said no to the permission prompt. Nothing is bound to the id.
+                    abandonPendingWidget()
+                }
+                return
+            }
+
+            REQUEST_CONFIGURE_WIDGET -> {
+                val appWidgetId = data?.getIntExtra(
+                    android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID,
+                    pendingWidgetId,
+                ) ?: pendingWidgetId
+                if (resultCode == RESULT_OK) {
+                    placeWidget(appWidgetId)
+                } else {
+                    // Backing out of a configuration screen means the widget was never wanted.
+                    abandonPendingWidget()
+                }
+                return
+            }
+        }
 
         val component = pendingIconComponent
         pendingIconComponent = null
@@ -988,11 +1274,15 @@ class Launcher : Activity(), ItemPlacementHandler {
     }
 
     override fun onItemRemoved(info: ItemInfo) {
+        closeResizeFrame()
         scope.launch {
             findViewFor(info)?.let { removeViewFromParent(it) }
             if (info.id != app.auriel.edenlauncher.model.NO_ID) {
                 appState.repository.deleteItem(info)
             }
+            // The row is gone, so nothing will ever ask for this id again. Left allocated, it is
+            // leaked for the life of the install and its provider keeps being told it exists.
+            if (info is LauncherAppWidgetInfo) widgetHost.releaseWidgetId(info.appWidgetId)
             if (info is FolderInfo && openFolder?.folderInfo === info) closeFolder()
         }
     }
@@ -1191,6 +1481,23 @@ class Launcher : Activity(), ItemPlacementHandler {
     // ---- lifecycle -------------------------------------------------------------------------------
 
     /**
+     * Widget updates only arrive while the host is listening.
+     *
+     * Tied to start and stop rather than to the activity's whole life: a launcher sitting behind
+     * another app has nothing to draw updates into, and a provider woken to push RemoteViews at a
+     * screen nobody is looking at is exactly the background cost this project is trying to avoid.
+     */
+    override fun onStart() {
+        super.onStart()
+        widgetHost.startListeningSafely()
+    }
+
+    override fun onStop() {
+        widgetHost.stopListeningSafely()
+        super.onStop()
+    }
+
+    /**
      * Grid settings change the whole view hierarchy, so returning from settings with a different
      * grid recreates the activity rather than trying to reshape the workspace in place.
      */
@@ -1209,8 +1516,11 @@ class Launcher : Activity(), ItemPlacementHandler {
         }
 
         // A changed icon pack needs a reload, not a recreate: the views are all still the right
-        // shape, they are only holding the wrong bitmaps.
-        val icons = appState.preferences.iconPackPackage.orEmpty()
+        // shape, they are only holding the wrong bitmaps. Simple mode rides along in the same
+        // signature because turning it on stops packs and custom icons being consulted, which is
+        // the same kind of change.
+        val icons = appState.preferences.iconPackPackage.orEmpty() +
+            if (appState.preferences.simpleMode) "|simple" else ""
         if (iconSignature == null) {
             iconSignature = icons
         } else if (iconSignature != icons) {
@@ -1257,6 +1567,7 @@ class Launcher : Activity(), ItemPlacementHandler {
     private fun onBackRequested() {
         when {
             dragController.isDragging -> dragController.cancelDrag()
+            closeResizeFrame() -> Unit
             iconOptions != null -> closeIconOptions()
             binding.workspace.isInOverview -> exitOverview()
             allApps.isOpen -> closeAllApps()
@@ -1295,5 +1606,10 @@ class Launcher : Activity(), ItemPlacementHandler {
 
         const val REQUEST_CUSTOM_ICON = 1
         const val REQUEST_PACK_ICON = 2
+
+        /** The three legs of adding a widget: choose it, be allowed to bind it, configure it. */
+        const val REQUEST_PICK_WIDGET = 3
+        const val REQUEST_BIND_WIDGET = 4
+        const val REQUEST_CONFIGURE_WIDGET = 5
     }
 }

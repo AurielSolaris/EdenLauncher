@@ -140,9 +140,22 @@ class IconPack(context: Context, val packageName: String) {
     }
 
     private fun loadDrawable(res: Resources, name: String): Drawable? {
-        val id = res.getIdentifier(name, "drawable", packageName)
+        val id = identifierFor(res, name)
         if (id == 0) return null
         return runCatching { res.getDrawableForDensity(id, densityDpi, null) }.getOrNull()
+    }
+
+    /**
+     * Resolves a pack's drawable name to a resource id.
+     *
+     * `drawable` is where the convention says these live and where nearly all of them are, but a
+     * pack built from a template that used `mipmap` ships them there instead, and looking only in
+     * `drawable` means silently showing nothing for every icon in it.
+     */
+    private fun identifierFor(res: Resources, name: String): Int {
+        val drawable = res.getIdentifier(name, "drawable", packageName)
+        if (drawable != 0) return drawable
+        return res.getIdentifier(name, "mipmap", packageName)
     }
 
     private val densityDpi = appContext.resources.displayMetrics.densityDpi
@@ -171,7 +184,24 @@ class IconPack(context: Context, val packageName: String) {
         if (names.isEmpty()) names.addAll(drawableForComponent.values.distinct())
 
         // A pack can list the same icon under several categories.
-        return names.distinct()
+        val listed = names.distinct()
+
+        // The list is authored by hand and drifts from what the pack actually ships: an icon gets
+        // renamed or dropped and the entry stays. Those names resolve to nothing and used to show
+        // as blank tiles the user could still pick, which sets an empty icon on an app. Offering
+        // nothing is better than offering a hole, so they are filtered here.
+        //
+        // This costs one resource lookup per name - tens of milliseconds for a few thousand, off
+        // the main thread, once per time the browser is opened.
+        val resolvable = listed.filter { identifierFor(res, it) != 0 }
+        if (resolvable.size != listed.size) {
+            EdenLog.i(
+                TAG,
+                "$packageName: ${listed.size - resolvable.size} of ${listed.size} listed " +
+                    "drawables do not resolve and were left out of the browser",
+            )
+        }
+        return resolvable
     }
 
     private fun openDrawableList(res: Resources): InputStream? {

@@ -51,8 +51,15 @@ Eden gives that back. Every one of those is a setting, and the defaults are only
   preferences off, and no two OEM Settings apps agree on where they should live.
 - **A log you can read on the device.** The last 48 hours of what Eden did, kept locally, thrown
   away after that, and shared only if you press Share.
+- **Widgets, hosted properly.** Every widget your phone provides, grouped by app, each one labelled
+  with how many cells it will take *on your grid* rather than on some assumed one - and anything
+  that cannot fit is shown but not offered, instead of failing after you have already agreed to it.
+  Drag them between pages, and drag the handles to resize in whole cells.
+- **A simple mode, if you want less.** One switch turns Eden back into what it was at v0.2.0 - a
+  home screen, a drawer, wallpapers, and the settings for them. It puts things away; it never
+  deletes them, and everything comes back the moment you switch it off.
 
-Coming next: widget hosting, then icon shapes.
+Coming next: icon shapes, then notification dots.
 
 ---
 
@@ -182,12 +189,12 @@ Share.</sub></td>
 | Phase | Scope | State |
 |-------|-------|-------|
 | **1** | Foundation - project, models, database, workspace, paging, drag layer | **Done** |
-| **2** | Core launcher - loader, drag & drop, app drawer, folders, page management | **Done** (widget hosting deferred) |
+| **2** | Core launcher - loader, drag & drop, app drawer, folders, page management | **Done** |
 | **3** | Live wallpaper - GL engine, eleven bundled wallpapers, video wallpapers, still-frame picker | **Done** |
 | **4** | Icons - icon packs, per-app icons, wallpaper cropping, live app list, on-device log | **Done** |
-| 5 | Widgets - `AppWidgetHost`, the bind-permission flow, resize frames | Next |
+| 5 | Widgets - `AppWidgetHost`, the bind flow, the picker, resize frames | **Done**; simple mode and the rest of 0.5.0 in progress |
 
-Running on a Galaxy M31 (Android 16, API 36). Release APK is about 800 KB, with no native code.
+Running on a Galaxy M31 (Android 16, API 36). Release APK is about 850 KB, with no native code.
 
 ---
 
@@ -271,7 +278,7 @@ Eden/
         |-- icons/                  Icon packs, the in-pack browser, per-app overrides
         |-- media/                  MediaCodec video transcoder
         |-- settings/               Preferences and the settings screen
-        |-- widget/                 Placeholder until hosting lands
+        |-- widget/                 AppWidgetHost, the picker, resize frames
         `-- util/                   Icon cache, user cache, bitmap helpers, the on-device log
 ```
 
