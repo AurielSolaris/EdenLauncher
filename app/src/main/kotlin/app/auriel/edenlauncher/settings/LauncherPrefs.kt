@@ -77,6 +77,21 @@ class LauncherPrefs(context: Context) {
         get() = prefs.getLong(KEY_DEFAULT_SCREEN, NO_DEFAULT_SCREEN)
         set(value) = prefs.edit().putLong(KEY_DEFAULT_SCREEN, value).apply()
 
+    /**
+     * Whether tapping beside an open folder closes it.
+     *
+     * On, because it is what the panel looks like it should do: it floats over the home screen with
+     * the workspace visible around it, and tapping the part you can still see is the obvious way to
+     * put it away. Back still closes a folder either way - this adds a second way, it does not take
+     * the first one off anyone who prefers it.
+     *
+     * Offered as a setting rather than assumed because the gesture costs something: while a folder
+     * is open, a tap beside it can no longer reach the icon underneath.
+     */
+    var closeFolderOnTapOutside: Boolean
+        get() = prefs.getBoolean(KEY_FOLDER_TAP_OUTSIDE, true)
+        set(value) = prefs.edit().putBoolean(KEY_FOLDER_TAP_OUTSIDE, value).apply()
+
     /** Whether workspace icons show their label. */
     var showWorkspaceLabels: Boolean
         get() = prefs.getBoolean(KEY_SHOW_LABELS, true)
@@ -323,6 +338,7 @@ class LauncherPrefs(context: Context) {
         private const val KEY_DRAWER_COLUMNS = "drawer_columns"
         private const val KEY_HOTSEAT_ICONS = "hotseat_icons"
         private const val KEY_DEFAULT_SCREEN = "default_screen_id"
+        private const val KEY_FOLDER_TAP_OUTSIDE = "folder_close_on_tap_outside"
         private const val KEY_SHOW_LABELS = "show_workspace_labels"
         private const val KEY_ICON_SIZE_PERCENT = "icon_size_percent"
         private const val KEY_ICON_PAD_VERTICAL = "icon_padding_vertical"

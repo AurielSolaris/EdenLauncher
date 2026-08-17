@@ -104,6 +104,8 @@ class SettingsActivity : Activity() {
             ) { prefs.hotseatIcons = it },
         )
 
+        column.addView(folderTapOutsideToggle(), spacedParams(spacing))
+
         column.addView(rotationToggle(), spacedParams(spacing))
 
         column.addView(header(getString(R.string.settings_section_icons)), spacedParams(spacing * 2))
@@ -401,6 +403,25 @@ class SettingsActivity : Activity() {
             if (checked == prefs.simpleMode) return@setOnCheckedChangeListener
             prefs.simpleMode = checked
             setContentView(buildContentView())
+        }
+    }
+
+    /**
+     * Whether tapping beside an open folder closes it. On by default; see
+     * [LauncherPrefs.closeFolderOnTapOutside] for what it costs when it is on.
+     */
+    private fun folderTapOutsideToggle(): View {
+        val toggle = android.widget.CheckBox(this).apply {
+            text = getString(R.string.settings_folder_tap_outside)
+            setTextColor(getColor(R.color.settings_text))
+            textSize = 16f
+            isChecked = prefs.closeFolderOnTapOutside
+            setOnCheckedChangeListener { _, checked -> prefs.closeFolderOnTapOutside = checked }
+        }
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(toggle)
+            addView(summary(getString(R.string.settings_folder_tap_outside_summary)))
         }
     }
 

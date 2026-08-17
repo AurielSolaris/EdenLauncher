@@ -175,6 +175,16 @@ class AllAppsContainerView @JvmOverloads constructor(
     }
 
     /**
+     * The icons on the entries already shown have changed, but the list has not.
+     *
+     * Called batch by batch while an icon pack is applied after the drawer was built; see
+     * [AppDrawerView.refreshIcons] for why this is not a resubmit.
+     */
+    fun refreshIcons() {
+        drawerView?.refreshIcons()
+    }
+
+    /**
      * Filters by label. Substring rather than prefix matching, because "tube" should find
      * "YouTube" - the behaviour every OEM drawer has and stock AOSP did not.
      *

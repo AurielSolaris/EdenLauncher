@@ -8,6 +8,7 @@
     <string name="all_apps_button_label">Apps</string>
 
     <string name="folder_name">Folder</string>
+    <string name="folder_no_space">No room on the home screen for that app</string>
 
     <string name="remove_drop_target_label">Remove</string>
 
@@ -173,12 +174,15 @@
     <string name="about_email_subject">Eden</string>
 
     <string name="settings_section_about">About</string>
+    <string name="settings_folder_tap_outside">Tap beside a folder to close it</string>
+    <string name="settings_folder_tap_outside_summary">On. Back closes an open folder either way; this adds tapping the home screen around it. While a folder is open that tap closes the folder instead of reaching the icon underneath.</string>
     <string name="settings_allow_rotation">Rotate the home screen</string>
     <string name="settings_allow_rotation_summary">Off. A launcher that turns sideways because you put the phone down at an angle is rarely what anyone wanted. Apps you open still rotate exactly as they did.</string>
 
     <!-- Icon options -->
     <string name="icon_option_rename">Rename</string>
     <string name="icon_option_new_folder">Put in a new folder</string>
+    <string name="icon_option_take_out_of_folder">Take out of this folder</string>
     <string name="icon_option_remove">Remove from home screen</string>
     <string name="icon_option_uninstall">Uninstall</string>
     <string name="icon_option_app_info">App settings</string>

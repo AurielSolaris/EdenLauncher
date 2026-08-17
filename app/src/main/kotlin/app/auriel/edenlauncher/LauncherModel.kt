@@ -211,6 +211,54 @@ class LauncherModel(
         if (item.title.isNullOrEmpty()) item.title = activity.label
     }
 
+    // ---- icon theming, pass two ------------------------------------------------------------------
+
+    /**
+     * True when an icon pack or a hand-picked icon would change anything.
+     *
+     * Read before starting the second pass at all, so a user with neither never pays for it. See
+     * [IconCache.themedIcon] for why the pass exists.
+     */
+    val hasThemedIcons: Boolean get() = iconCache.hasThemedSource
+
+    /**
+     * Replaces the icons on [items] with what the pack makes of them.
+     *
+     * Called in small batches after the workspace is already on screen, so the pack arrives over
+     * the top of a launcher the user can already use rather than in front of one they cannot.
+     *
+     * @return true when at least one icon actually changed, which is the caller's cue to redraw.
+     *   An app the pack does not theme leaves its icon exactly as the first pass set it.
+     */
+    suspend fun applyThemedIcons(items: List<ShortcutInfo>): Boolean = withContext(io) {
+        var changed = false
+        for (item in items) {
+            val component = item.targetComponent ?: continue
+            val activity = activityCache[ComponentKey(component, item.user)] ?: continue
+            val themed = iconCache.themedIcon(activity, item.user) ?: continue
+            if (themed !== item.icon) {
+                item.icon = themed
+                changed = true
+            }
+        }
+        changed
+    }
+
+    /** The same pass for drawer entries. */
+    suspend fun applyThemedIconsToApps(apps: List<AppInfo>): Boolean = withContext(io) {
+        var changed = false
+        for (app in apps) {
+            val component = app.componentName ?: continue
+            val activity = activityCache[ComponentKey(component, app.user)] ?: continue
+            val themed = iconCache.themedIcon(activity, app.user) ?: continue
+            if (themed !== app.icon) {
+                app.icon = themed
+                changed = true
+            }
+        }
+        changed
+    }
+
     /**
      * First-run layout: the dock is filled with the handset staples, and the first workspace page
      * is left clear so the wallpaper is visible. Everything else lives in the drawer.

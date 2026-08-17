@@ -22,6 +22,15 @@ interface AppDrawerView {
     fun resetScroll()
 
     /**
+     * Re-reads the icon off every entry currently on screen.
+     *
+     * Called while the icon pack is being applied over a drawer that is already built. Deliberately
+     * not a resubmit: the list, the filter and the scroll position have not changed, only the
+     * bitmaps, and rebuilding would throw away where the user was.
+     */
+    fun refreshIcons()
+
+    /**
      * True when a further downward drag has nothing left to scroll.
      *
      * The container asks before it takes a gesture over for pull-to-close. Answering true while

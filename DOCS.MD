@@ -24,9 +24,19 @@ touch -> DragLayer -> DragController -> DropTarget -> ItemPlacementHandler -> La
    profile, read `favorites` and `workspaceScreens`, resolve icons, write a first-run dock layout
    if the database is empty.
 4. The result is bound on the main thread. One disk read, one bind.
+5. `Launcher.applyIconTheme` puts the icon pack on afterwards, in batches, if there is one. See
+   [Icons](#icons).
 
 `LauncherAppState` holds everything process-wide and builds it lazily: the database, the icon
 cache, the grid, preferences.
+
+Which page the launcher opens on is resolved inside `Launcher.bind`, after `bindScreens`, and
+nowhere else. The home page is stored as a page *id* (so reordering pages does not move it), and
+turning an id into an index needs the id list to exist. Resolved before the bind - which is what
+the caller used to do - the only answer an empty workspace can give is "no such page", so the
+launcher fell back to the leftmost one and the user's choice was ignored on every cold start.
+`Workspace` remembers the id for the same reason: `bindOverviewCallbacks` used to take it as an
+argument defaulting to -1, and every caller that did not happen to know it cleared the home badge.
 
 ## Data
 
@@ -75,6 +85,42 @@ The popup fills the drag layer and handles its own dismissal rather than using
 `DragLayer.setTouchCompleteListener`. That hook fires on the `ACTION_UP` of the very long press
 that opened the menu, so routing dismissal through it made the popup appear and vanish inside one
 gesture.
+
+The same gesture works inside an open folder, through `Folder.onItemLongClick`. Without it a folder
+was the one arrangement in the launcher that could not be undone: apps went in and there was no
+gesture that took them out again. Dragging out closes the panel from `DragController.onDragStart` -
+after the drag view has been snapshotted from it, not before - and `Launcher.dragSourceFolder`
+remembers where the item came from so `onItemPlaced` and `onItemRemoved` can take it out of the
+folder's contents wherever it lands. The in-memory folder is a separate list from the database row;
+one left holding an app that is now on the workspace shows it twice until the next load, and puts
+it back in the folder on the one after that.
+
+## Where a drag is going to land
+
+`Workspace.onDragOver` resolves the target cell on every move and hands it to
+`CellLayout.setDropPreview`, which draws it under the icons. `setDropPreview` compares against what
+it is already showing and only invalidates on a change, so a finger moving inside one cell costs a
+hit test and nothing else. Landing on another icon makes a folder rather than taking that cell, and
+is drawn in the accent colour to say so.
+
+Both the preview and the drop itself go through `Workspace.resolveDropCell`, which starts with a
+rule the plain nearest-vacant search cannot express: the cell an item was picked up from is still
+marked occupied for the length of the drag, by the hidden item itself. Without the exception,
+letting go exactly where you picked up pushed the icon one cell along. Single-cell items only - a
+widget moved by less than its own size needs its whole new span checked, not just the corner.
+
+## Closing a folder by tapping beside it
+
+`DragLayer` owns this, the same way it owns the widget resize frame's outside-tap: the panel floats
+over the workspace, so a tap meant for "put this away" lands on the workspace, which the folder
+never sees. The gesture is then *swallowed* rather than passed on - closing the folder and
+launching the icon behind it is not what anyone meant by tapping off a folder. `Folder` is also
+clickable so it absorbs taps on its own padding.
+
+Suspended while `IconOptionsPopup` is up: the popup fills the drag layer and handles its own
+outside taps, and the drag layer sees the touch first, so leaving the hook armed would swallow the
+tap meant for a menu row. Back still closes a folder either way; the tap is a second route, and
+`LauncherPrefs.closeFolderOnTapOutside` turns it off for anyone who wants the icon underneath back.
 
 ## Widgets
 
@@ -187,7 +233,7 @@ hang a `Migration` off and databases in the wild already contain them.
 
 ## Icons
 
-Three sources, most specific first. `IconCache.resolve` is the whole policy:
+Three sources, most specific first:
 
 1. an icon the user picked for that one app (`icons/CustomIcons`),
 2. the icon pack in force (`icons/IconPack`),
@@ -195,6 +241,33 @@ Three sources, most specific first. `IconCache.resolve` is the whole policy:
 
 That order is deliberate. Choosing an icon for one app is a more specific instruction than choosing
 a pack for all of them, so switching packs must not silently undo it.
+
+### Two passes
+
+Sources 1 and 2 are resolved *after* the home screen is on screen, not during the load.
+
+The reason is cost. Asking the package manager for an app's own icon and rasterising it is cheap.
+Resolving a themed one is not: the first call parses the pack's `appfilter.xml`, and every app the
+pack has no entry for gets a background, a mask and an overlay composed under and over it. Charged
+per app across a phone's whole app list, that is seconds of work in front of a blank launcher -
+which is what a launcher with a pack selected used to look like it was hanging on.
+
+So `IconCache` keeps two caches and offers two calls:
+
+| Call | Cost | Who |
+|------|------|-----|
+| `getIcon` | One package-manager icon, rasterised. Never opens a pack. | `LauncherModel.load`, on the critical path. |
+| `themedIcon` | Custom icon, then pack entry, then composition. Returns null when nothing applies. | `Launcher.applyIconTheme`, after the bind. |
+
+`Launcher.applyIconTheme` walks the placed icons first - they are the ones being looked at - then
+the drawer, twelve at a time, redrawing between batches so the pack visibly arrives in waves. It
+does not start at all unless `IconCache.hasThemedSource` says a pack or a custom icon is actually
+in force, so the common case pays nothing for the machinery.
+
+The base cache entry for a component is dropped once its themed icon exists: the app's own icon was
+only wanted as the layer underneath, and holding both would double what a themed home screen costs.
+Changing the pack evicts only the themed cache - an app's own icon does not change because the user
+picked a different pack.
 
 Icon packs have no Android API and never did - they are a convention that grew out of ADW, in which
 an ordinary APK ships `appfilter.xml` mapping `ComponentInfo{pkg/cls}` to a drawable name. A pack

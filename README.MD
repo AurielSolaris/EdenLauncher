@@ -24,7 +24,11 @@ Eden gives that back. Every one of those is a setting, and the defaults are only
   through fixed pages. Same apps, same search, your choice of gesture. Set the background anywhere
   from fully opaque to fully transparent so your wallpaper shows through.
 - **Drag and drop** icons between pages and the dock, stack two icons to make a folder, drag to
-  Remove to get rid of one.
+  Remove to get rid of one. The cell you are about to drop into is marked while you drag, and
+  letting go where you picked up leaves the icon exactly where it was.
+- **Folders open both ways.** Hold an app inside one to rename it, take it back out onto the page,
+  or drag it anywhere else. Tap beside an open folder to close it, or use back - whichever you
+  reach for, and you can turn the tap off in settings.
 - **Your grid, your icons.** Columns, rows, dock size, icon size, spacing, label gap - all
   adjustable, all with an Auto that just works if you would rather not think about it.
 - **Eleven live wallpapers**, rewritten from the AOSP originals that Android stopped shipping - Phase
@@ -40,7 +44,9 @@ Eden gives that back. Every one of those is a setting, and the defaults are only
   screen - the bright area is exactly what you will see. Home screen, lock screen, or both, and you
   can reframe later without hunting for the photo again.
 - **Icon packs**, any you have installed, read the way every other launcher reads them. Packs that
-  ship a background and mask theme the apps they have no entry for too.
+  ship a background and mask theme the apps they have no entry for too. The home screen appears at
+  the speed it would with no pack at all and the pack lands on top of it, rather than making you
+  wait on a blank screen while a few hundred icons are composed.
 - **Any icon, for any app.** Long-press and pick from the whole pack in a searchable grid, or hand
   it a picture. A chosen icon outranks the pack, so switching packs never silently undoes it.
 - **Rename anything**, on the home screen or in the drawer, and clear the field to get the app's own

@@ -269,8 +269,20 @@ class Workspace @JvmOverloads constructor(
     /**
      * Finds the first page with room for a [spanX] x [spanY] item, writing the free cell into
      * [outCell]. Returns the page id, or -1 when every page is full.
+     *
+     * [preferredScreenId] is tried first. An item that has just been taken out of a folder should
+     * land on the page the folder is on, not on whichever page happens to be leftmost - otherwise
+     * the app the user was looking at disappears to a screen they were not looking at.
      */
-    fun findFreeCell(outCell: IntArray, spanX: Int = 1, spanY: Int = 1): Long {
+    fun findFreeCell(
+        outCell: IntArray,
+        spanX: Int = 1,
+        spanY: Int = 1,
+        preferredScreenId: Long = -1L,
+    ): Long {
+        screens.get(preferredScreenId)?.let { preferred ->
+            if (preferred.findVacantCell(outCell, spanX, spanY)) return preferredScreenId
+        }
         for (i in screenOrder.indices) {
             val page = screens.get(screenOrder[i]) ?: continue
             if (page.findVacantCell(outCell, spanX, spanY)) return screenOrder[i]
@@ -290,9 +302,69 @@ class Workspace @JvmOverloads constructor(
 
     override fun onDragEnter(d: DragObject) = Unit
 
-    override fun onDragOver(d: DragObject) = Unit
+    /**
+     * Marks the cell the item would land in, so a drag says where it is going before it gets there.
+     *
+     * Runs per touch event: nothing here allocates, and [CellLayout.setDropPreview] only redraws
+     * when the answer actually changes, so a finger moving inside one cell costs a hit test.
+     */
+    override fun onDragOver(d: DragObject) {
+        val info = d.dragInfo ?: return
+        val page = currentCellLayout ?: return
 
-    override fun onDragExit(d: DragObject) = Unit
+        tmpPoint[0] = d.x
+        tmpPoint[1] = d.y
+        (parent as? DragLayer)?.mapCoordInSelfToDescendant(page, tmpPoint)
+
+        val onIcon = isOverAnotherIcon(page, info)
+        if (!onIcon && !resolveDropCell(page, info)) {
+            clearDropPreview()
+            return
+        }
+
+        if (previewPage !== page) clearDropPreview()
+        previewPage = page
+        page.setDropPreview(tmpCell[0], tmpCell[1], info.spanX, info.spanY, onIcon)
+    }
+
+    override fun onDragExit(d: DragObject) = clearDropPreview()
+
+    /** The item under [tmpPoint] on [page], when it is something other than [info] itself. */
+    private fun isOverAnotherIcon(page: CellLayout, info: ItemInfo): Boolean {
+        page.pointToCell(tmpPoint[0], tmpPoint[1], tmpCell)
+        val existingInfo = page.getChildAtCell(tmpCell[0], tmpCell[1])?.let(::viewInfo)
+        return existingInfo is ShortcutInfo && existingInfo !== info && info is ShortcutInfo
+    }
+
+    /**
+     * Writes the cell an item of [info]'s span would land in at [tmpPoint] into [tmpCell].
+     *
+     * The cell an item was picked up from stays marked occupied for the length of the drag - by the
+     * item itself, which is hidden rather than removed. Without the first check here, letting go
+     * where you picked up would push the icon one cell along instead of leaving it alone, which is
+     * the single most annoying thing a launcher can do while you are arranging a page. Only for
+     * single-cell items: a widget moved by less than its own size would need its whole new span
+     * checked, not just the corner.
+     *
+     * @return false when the page has no room at all.
+     */
+    private fun resolveDropCell(page: CellLayout, info: ItemInfo): Boolean {
+        page.pointToCell(tmpPoint[0], tmpPoint[1], tmpCell)
+        if (info.spanX == 1 && info.spanY == 1 &&
+            page.getChildAtCell(tmpCell[0], tmpCell[1])?.let(::viewInfo) === info
+        ) {
+            return true
+        }
+        return page.findNearestVacantCell(tmpPoint[0], tmpPoint[1], info.spanX, info.spanY, tmpCell)
+    }
+
+    /** The page currently showing a drop hint, so it can be cleared without searching for it. */
+    private var previewPage: CellLayout? = null
+
+    private fun clearDropPreview() {
+        previewPage?.clearDropPreview()
+        previewPage = null
+    }
 
     override fun getHitRectRelativeToDragLayer(outRect: Rect) {
         val dragLayer = parent as? DragLayer ?: run {
@@ -309,6 +381,8 @@ class Workspace @JvmOverloads constructor(
      * folder adds to it, and anything else lands in the nearest free cell.
      */
     override fun onDrop(d: DragObject) {
+        clearDropPreview()
+
         val info = d.dragInfo ?: return
         val page = currentCellLayout ?: return
         val handler = placementHandler ?: return
@@ -343,8 +417,9 @@ class Workspace @JvmOverloads constructor(
             return
         }
 
-        // Plain move: nearest free cell to where the finger let go.
-        if (!page.findNearestVacantCell(tmpPoint[0], tmpPoint[1], info.spanX, info.spanY, tmpCell)) {
+        // Plain move: the cell under the finger when it is free - including the one the item was
+        // picked up from - and otherwise the nearest free one.
+        if (!resolveDropCell(page, info)) {
             d.cancelled = true
             return
         }
@@ -362,6 +437,9 @@ class Workspace @JvmOverloads constructor(
     // ---- drag source ---------------------------------------------------------------------------
 
     override fun onDropCompleted(target: View?, d: DragObject, success: Boolean) {
+        // Every drag in the launcher names the workspace as its source, so this is the one place
+        // guaranteed to run at the end of one, whichever target it landed on.
+        clearDropPreview()
         if (!success) {
             // Put the view back where it was; the model was never changed.
             d.originalView?.visibility = View.VISIBLE
@@ -471,8 +549,19 @@ class Workspace @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Id of the page carrying the home badge, or -1 when the user has not chosen one.
+     *
+     * Remembered here rather than passed in on every call. It used to be an argument defaulting to
+     * -1, and every caller that did not happen to know the answer - entering overview, adding a
+     * page - quietly cleared the badge, so the page the user had chosen as home stopped being
+     * marked as one the moment they looked at overview again.
+     */
+    private var homeScreenId: Long = -1L
+
     /** Rewires page badges; called on entry and whenever pages are added or removed. */
-    fun bindOverviewCallbacks(homeScreenId: Long = -1L) {
+    fun bindOverviewCallbacks(homeScreenId: Long = this.homeScreenId) {
+        this.homeScreenId = homeScreenId
         for (i in 0 until childCount) {
             val page = getChildAt(i) as? CellLayout ?: continue
             val screenId = screenOrder.getOrNull(i) ?: continue
@@ -486,6 +575,7 @@ class Workspace @JvmOverloads constructor(
 
     /** Marks which card carries the home badge. */
     fun setHomeScreen(screenId: Long) {
+        homeScreenId = screenId
         for (i in 0 until childCount) {
             val page = getChildAt(i) as? CellLayout ?: continue
             page.isHomePage = screenOrder.getOrNull(i) == screenId

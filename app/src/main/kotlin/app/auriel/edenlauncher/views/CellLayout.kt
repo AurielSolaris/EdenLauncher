@@ -118,7 +118,78 @@ open class CellLayout @JvmOverloads constructor(
     private val badgeActiveColor = context.getColor(R.color.eden_leaf)
     private val badgeGlyphColor = context.getColor(R.color.eden_surface)
 
+    // ---- drop preview ----------------------------------------------------------------------------
+
+    /**
+     * The cells a drop would land in, or an empty span when there is nothing to show.
+     *
+     * A drag used to give no answer at all to "where is this going?" until the finger came up and
+     * the icon appeared somewhere - which is most of what made moving apps feel like guesswork.
+     * Drawn from [onDraw], so it sits under the icons rather than over them.
+     */
+    private var previewCellX = -1
+    private var previewCellY = -1
+    private var previewSpanX = 0
+    private var previewSpanY = 0
+    private var previewIsFolder = false
+
+    private val previewFillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val previewStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val previewRect = RectF()
+
+    private val previewFillColor = context.getColor(R.color.drop_preview_fill)
+    private val previewStrokeColor = context.getColor(R.color.drop_preview_stroke)
+    private val previewFolderFillColor = context.getColor(R.color.drop_preview_folder_fill)
+    private val previewFolderStrokeColor = context.getColor(R.color.drop_preview_folder_stroke)
+
+    /** Shows the hint at ([cellX], [cellY]); [forFolder] when dropping there would make a folder. */
+    fun setDropPreview(cellX: Int, cellY: Int, spanX: Int, spanY: Int, forFolder: Boolean) {
+        if (previewCellX == cellX && previewCellY == cellY &&
+            previewSpanX == spanX && previewSpanY == spanY && previewIsFolder == forFolder
+        ) {
+            return
+        }
+        previewCellX = cellX
+        previewCellY = cellY
+        previewSpanX = spanX
+        previewSpanY = spanY
+        previewIsFolder = forFolder
+        invalidate()
+    }
+
+    fun clearDropPreview() {
+        if (previewSpanX == 0 && previewSpanY == 0) return
+        previewSpanX = 0
+        previewSpanY = 0
+        invalidate()
+    }
+
+    private fun drawDropPreview(canvas: Canvas) {
+        if (previewSpanX <= 0 || previewSpanY <= 0) return
+        if (cellWidth <= 0 || cellHeight <= 0) return
+
+        val inset = PREVIEW_INSET_DP * density
+        val left = paddingLeft + previewCellX * cellWidth + inset
+        val top = paddingTop + previewCellY * cellHeight + inset
+        previewRect.set(
+            left,
+            top,
+            left + previewSpanX * cellWidth - inset * 2,
+            top + previewSpanY * cellHeight - inset * 2,
+        )
+
+        previewFillPaint.color = if (previewIsFolder) previewFolderFillColor else previewFillColor
+        previewStrokePaint.color =
+            if (previewIsFolder) previewFolderStrokeColor else previewStrokeColor
+        previewStrokePaint.strokeWidth = PREVIEW_STROKE_DP * density
+
+        val radius = PREVIEW_RADIUS_DP * density
+        canvas.drawRoundRect(previewRect, radius, radius, previewFillPaint)
+        canvas.drawRoundRect(previewRect, radius, radius, previewStrokePaint)
+    }
+
     override fun onDraw(canvas: Canvas) {
+        drawDropPreview(canvas)
         if (overviewProgress <= 0f) return
 
         val alpha = (255 * overviewProgress).toInt()
@@ -449,5 +520,10 @@ open class CellLayout @JvmOverloads constructor(
         const val BADGE_RADIUS_DP = 16f
         const val BADGE_MARGIN_DP = 10f
         const val CARD_RADIUS_DP = 18f
+
+        /** Keeps the hint inside its cell rather than flush against the next one. */
+        const val PREVIEW_INSET_DP = 4f
+        const val PREVIEW_RADIUS_DP = 12f
+        const val PREVIEW_STROKE_DP = 1.5f
     }
 }
