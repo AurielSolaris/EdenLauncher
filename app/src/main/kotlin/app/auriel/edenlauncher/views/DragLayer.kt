@@ -198,6 +198,20 @@ class DragLayer @JvmOverloads constructor(
     var activeResizeFrame: View? = null
     var onTouchOutsideResizeFrame: (() -> Unit)? = null
 
+    /**
+     * The open folder panel, when tapping away from it is meant to close it, and what to do.
+     *
+     * Same reasoning as the resize frame, plus one of its own: the panel floats over the workspace,
+     * so a tap beside it lands on whatever icon happens to be behind. Closing the folder *and*
+     * launching the app underneath is not what anybody meant by tapping off a folder, so the whole
+     * gesture is swallowed here rather than let through.
+     */
+    var activeFolder: View? = null
+    var onTouchOutsideFolder: (() -> Unit)? = null
+
+    /** Set for the rest of a gesture that only ever meant "close the folder". */
+    private var swallowingGesture = false
+
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         if (ev.action == MotionEvent.ACTION_UP || ev.action == MotionEvent.ACTION_CANCEL) {
             touchCompleteListener?.onTouchComplete()
@@ -208,6 +222,14 @@ class DragLayer @JvmOverloads constructor(
         if (frame != null && ev.action == MotionEvent.ACTION_DOWN && !isEventOverView(frame, ev)) {
             onTouchOutsideResizeFrame?.invoke()
         }
+
+        val folder = activeFolder
+        if (folder != null && ev.action == MotionEvent.ACTION_DOWN && !isEventOverView(folder, ev)) {
+            swallowingGesture = true
+            onTouchOutsideFolder?.invoke()
+            return true
+        }
+
         // Once a drag is running the drag layer owns the gesture, and children are cancelled.
         if (dragController?.onInterceptTouchEvent(ev) == true) return true
         return super.onInterceptTouchEvent(ev)
@@ -215,6 +237,12 @@ class DragLayer @JvmOverloads constructor(
 
     override fun onTouchEvent(ev: MotionEvent): Boolean {
         if (dragController?.onTouchEvent(ev) == true) return true
+        if (swallowingGesture) {
+            if (ev.action == MotionEvent.ACTION_UP || ev.action == MotionEvent.ACTION_CANCEL) {
+                swallowingGesture = false
+            }
+            return true
+        }
         return super.onTouchEvent(ev)
     }
 

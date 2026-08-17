@@ -78,6 +78,20 @@ class AppDrawerHorizontal(context: Context) : PagedView(context), AppDrawerView 
     override fun resetScroll() = setCurrentPage(0)
 
     /**
+     * Every page is built up front here, so every entry is walked - there is no recycling to pick
+     * up a changed bitmap later.
+     */
+    override fun refreshIcons() {
+        for (p in 0 until childCount) {
+            val page = getChildAt(p) as? CellLayout ?: continue
+            for (i in 0 until page.childCount) {
+                val icon = page.getChildAt(i) as? BubbleTextView ?: continue
+                (icon.itemInfo as? AppInfo)?.let { icon.setIconBitmap(it.icon) }
+            }
+        }
+    }
+
+    /**
      * Always false: pull-to-close is a vertical gesture, and this drawer's whole gesture vocabulary
      * is horizontal. Offering it here would mean a downward drag doing something different in the
      * two modes for no reason the user chose.

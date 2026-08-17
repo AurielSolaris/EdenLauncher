@@ -7,6 +7,7 @@ import androidx.recyclerview.widget.RecyclerView
 import app.auriel.edenlauncher.LauncherAppState
 import app.auriel.edenlauncher.R
 import app.auriel.edenlauncher.model.AppInfo
+import app.auriel.edenlauncher.views.BubbleTextView
 
 /**
  * Continuous vertical grid: fling up and down through every app, no pages.
@@ -55,6 +56,17 @@ class AppDrawerVertical(context: Context) : AppDrawerView {
     override fun submitApps(apps: List<AppInfo>) = adapter.submit(apps)
 
     override fun resetScroll() = recyclerView.scrollToPosition(0)
+
+    /**
+     * Only the attached views are touched. Everything else is off screen and will pick the new
+     * bitmap up from its [AppInfo] the next time it is bound, which recycling guarantees.
+     */
+    override fun refreshIcons() {
+        for (i in 0 until recyclerView.childCount) {
+            val icon = recyclerView.getChildAt(i) as? BubbleTextView ?: continue
+            (icon.itemInfo as? AppInfo)?.let { icon.setIconBitmap(it.icon) }
+        }
+    }
 
     /**
      * Asked of the RecyclerView itself rather than tracked alongside it. The list is the authority

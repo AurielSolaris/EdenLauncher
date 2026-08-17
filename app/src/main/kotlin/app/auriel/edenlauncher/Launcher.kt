@@ -102,6 +102,17 @@ class Launcher : Activity(), ItemPlacementHandler {
     /** The coalescing rebind. Cancelled and rescheduled while packages keep arriving. */
     private var packageRefreshJob: Job? = null
 
+    /** The icon pack being applied over an already-bound home screen. See [applyIconTheme]. */
+    private var iconThemeJob: Job? = null
+
+    /**
+     * The folder a drag started inside, so the item can be taken out of it wherever it lands.
+     *
+     * Held for the length of the gesture rather than read off the open folder, because the folder
+     * closes the moment the drag begins - the workspace the icon is heading for is behind it.
+     */
+    private var dragSourceFolder: FolderInfo? = null
+
     /** The app whose icon is being chosen, held across the trip to the document picker. */
     private var pendingIconComponent: android.content.ComponentName? = null
 
@@ -225,11 +236,18 @@ class Launcher : Activity(), ItemPlacementHandler {
                 exitOverview()
                 closeIconOptions()
                 closeResizeFrame()
+                // An icon on its way out of a folder needs somewhere to go, and the workspace is
+                // behind the panel. Closed here rather than when the drag was armed so the panel is
+                // still on screen for the drag view to be snapshotted from.
+                if (dragSourceFolder != null) closeFolder()
                 binding.dropTargetBar.setDragInProgress(true, info)
                 binding.workspace.addExtraEmptyScreen()
             }
 
             override fun onDragEnd() {
+                // A drag that was cancelled leaves the item in its folder, which is right: nothing
+                // was moved, so nothing should have been taken out.
+                dragSourceFolder = null
                 binding.dropTargetBar.setDragInProgress(false)
                 commitScreenChanges()
             }
@@ -296,20 +314,26 @@ class Launcher : Activity(), ItemPlacementHandler {
      */
     private fun setHomePage(screenId: Long) {
         appState.preferences.defaultScreenId = screenId
-        binding.workspace.setHomeScreen(screenId)
         updateHomePageIndicator()
         Toast.makeText(this, R.string.home_page_set, Toast.LENGTH_SHORT).show()
     }
 
-    /** Index of the page HOME returns to, falling back to the leftmost one. */
+    /**
+     * Index of the page HOME returns to, falling back to the leftmost one.
+     *
+     * Only meaningful once the pages are bound - the choice is stored as a page id, and turning an
+     * id into an index needs the id list. Calling it earlier always answered zero.
+     */
     private fun defaultPageIndex(): Int {
         val screenId = appState.preferences.defaultScreenId
         if (screenId == LauncherPrefs.NO_DEFAULT_SCREEN) return 0
         return binding.workspace.getScreenIndex(screenId).takeIf { it >= 0 } ?: 0
     }
 
+    /** Puts the chosen home page's mark on the dots and its badge on the overview card. */
     private fun updateHomePageIndicator() {
         val screenId = appState.preferences.defaultScreenId
+        binding.workspace.setHomeScreen(screenId)
         binding.pageIndicator.setHomeMarker(
             if (screenId == LauncherPrefs.NO_DEFAULT_SCREEN) -1 else binding.workspace.getScreenIndex(screenId),
         )
@@ -433,7 +457,7 @@ class Launcher : Activity(), ItemPlacementHandler {
         scope.launch {
             val started = android.os.SystemClock.uptimeMillis()
             val results = appState.model.load()
-            bind(results, if (restoredPage >= 0) restoredPage else defaultPageIndex())
+            bind(results, restoredPage)
             // The one measurement worth keeping: if the home screen is ever slow to appear, this
             // says whether the time went into the loader or into everything after it.
             EdenLog.i(
@@ -451,6 +475,12 @@ class Launcher : Activity(), ItemPlacementHandler {
      * The hierarchy is rebuilt rather than patched. A package change can add, remove, rename, and
      * re-icon any number of items at once, and rebuilding a few dozen views is cheaper than the
      * bookkeeping needed to work out which of them actually moved - and cannot go subtly wrong.
+     *
+     * @param targetPage the page to land on, or a negative number for "wherever home is". The
+     *   choice is resolved *here*, after the pages exist. Resolving it in the caller meant asking
+     *   an empty workspace which page carried a given id, and the only answer an empty workspace
+     *   can give is "none of them" - so every cold start ignored the user's home page and opened
+     *   on the leftmost one.
      */
     private fun bind(results: LauncherModel.LoaderResults, targetPage: Int) {
         closeFolder()
@@ -462,8 +492,92 @@ class Launcher : Activity(), ItemPlacementHandler {
         allApps.setApps(results.allApps)
 
         updateHomePageIndicator()
+        val page = if (targetPage >= 0) targetPage else defaultPageIndex()
         val lastPage = (binding.workspace.childCount - 1).coerceAtLeast(0)
-        binding.workspace.setCurrentPage(targetPage.coerceIn(0, lastPage))
+        binding.workspace.setCurrentPage(page.coerceIn(0, lastPage))
+
+        applyIconTheme(results)
+    }
+
+    // ---- icon theming ----------------------------------------------------------------------------
+
+    /**
+     * Applies the icon pack after the home screen is already on screen.
+     *
+     * Resolving a themed icon is expensive in a way an app's own icon is not: the first one parses
+     * the pack's `appfilter.xml`, and every app the pack has no entry for gets a background, a mask
+     * and an overlay composed under and over it. Done inline, that is a few hundred milliseconds
+     * of work per twenty apps sitting between the user and their home screen - which is what the
+     * launcher used to feel like it was hanging on when a pack was selected.
+     *
+     * So the loader now resolves the apps' own icons only, the workspace binds and is usable, and
+     * this pass replaces them a batch at a time. Placed icons go first because they are the ones
+     * being looked at; the drawer, which is not open, follows. Nothing here runs at all unless a
+     * pack or a hand-picked icon is actually in force.
+     */
+    private fun applyIconTheme(results: LauncherModel.LoaderResults) {
+        // A rebind supersedes the pass started by the one before it; the items it was updating are
+        // no longer the items on screen.
+        iconThemeJob?.cancel()
+        if (!appState.model.hasThemedIcons) return
+
+        iconThemeJob = scope.launch {
+            val started = android.os.SystemClock.uptimeMillis()
+
+            val placed = ArrayList<ShortcutInfo>(32)
+            collectShortcuts(results.workspaceItems, placed)
+            collectShortcuts(results.hotseatItems, placed)
+
+            for (batch in placed.chunked(ICON_THEME_BATCH)) {
+                if (appState.model.applyThemedIcons(batch)) refreshPlacedIcons()
+            }
+
+            for (batch in results.allApps.chunked(ICON_THEME_BATCH)) {
+                if (appState.model.applyThemedIconsToApps(batch)) allApps.refreshIcons()
+            }
+
+            EdenLog.i(
+                TAG,
+                "icon pack applied to ${placed.size} placed and ${results.allApps.size} drawer " +
+                    "icons in ${android.os.SystemClock.uptimeMillis() - started}ms",
+            )
+        }
+    }
+
+    /** Flattens placed items to the shortcuts that carry an icon, folder contents included. */
+    private fun collectShortcuts(items: List<ItemInfo>, into: MutableList<ShortcutInfo>) {
+        for (item in items) {
+            when (item) {
+                is FolderInfo -> into.addAll(item.contents)
+                is ShortcutInfo -> into.add(item)
+                else -> Unit
+            }
+        }
+    }
+
+    /** Re-reads the icon off every bound workspace and dock view. */
+    private fun refreshPlacedIcons() {
+        refreshIconsIn(binding.hotseat)
+        val workspace = binding.workspace
+        for (i in 0 until workspace.childCount) {
+            (workspace.getChildAt(i) as? CellLayout)?.let { refreshIconsIn(it) }
+        }
+    }
+
+    private fun refreshIconsIn(page: android.view.ViewGroup) {
+        for (i in 0 until page.childCount) {
+            when (val child = page.getChildAt(i)) {
+                is BubbleTextView -> (child.itemInfo as? ShortcutInfo)?.let {
+                    child.setIconBitmap(it.icon)
+                }
+
+                // A folder tile is drawn from its contents, and the open folder listens to the same
+                // notification, so one call updates both.
+                is FolderIcon -> child.folderInfo?.notifyItemsChanged()
+
+                else -> Unit
+            }
+        }
     }
 
     /**
@@ -759,6 +873,8 @@ class Launcher : Activity(), ItemPlacementHandler {
     private fun startDragFromWorkspace(view: View, info: ItemInfo): Boolean {
         closeFolder()
         closeIconOptions()
+        // This one is not coming out of a folder, whatever the last armed gesture was.
+        dragSourceFolder = null
 
         dragController.preparePendingDrag(
             view = view,
@@ -1278,6 +1394,10 @@ class Launcher : Activity(), ItemPlacementHandler {
         cellY: Int,
         rank: Int,
     ) {
+        // Done before the coroutine: the drop notifies this handler and then ends the drag, so by
+        // the time a suspended body resumed, the folder it came out of would already be forgotten.
+        detachFromDragSourceFolder(info)
+
         scope.launch {
             var targetScreen = screenId
 
@@ -1322,8 +1442,30 @@ class Launcher : Activity(), ItemPlacementHandler {
         }
     }
 
+    /**
+     * Takes an item that was dragged out of a folder out of that folder's contents.
+     *
+     * The database row moves with the drop, but the in-memory folder is a separate list, and one
+     * left holding an app that is now on the workspace shows it in two places until the next load -
+     * and puts it back in the folder on the one after that.
+     */
+    private fun detachFromDragSourceFolder(info: ItemInfo) {
+        val folder = dragSourceFolder ?: return
+        val item = info as? ShortcutInfo ?: return
+        if (!folder.contents.contains(item)) return
+        dragSourceFolder = null
+        folder.remove(item)
+
+        // A folder with nothing left in it goes, the same as when the last icon is removed from an
+        // open one. Checked here rather than left to the panel's own listener: the panel closed
+        // when the drag started and stopped listening on the way out, so by now there is nothing
+        // watching the folder but this.
+        if (folder.contents.isEmpty()) onItemRemoved(folder)
+    }
+
     override fun onItemRemoved(info: ItemInfo) {
         closeResizeFrame()
+        detachFromDragSourceFolder(info)
         scope.launch {
             findViewFor(info)?.let { removeViewFromParent(it) }
             if (info.id != app.auriel.edenlauncher.model.NO_ID) {
@@ -1448,19 +1590,139 @@ class Launcher : Activity(), ItemPlacementHandler {
         val folder = Folder(this).apply {
             placementHandler = this@Launcher
             onItemClick = { startApp(it, null) }
+            onItemLongClick = { item, view -> startDragFromFolder(info, item, view) }
             onClosed = {
-                openFolder = null
                 dragController.removeDropTarget(this)
+                // Guarded because closing is animated: opening a second folder starts the first
+                // one closing, and the callback that arrives afterwards must not tidy away the
+                // state that now belongs to the folder the user is looking at.
+                if (openFolder === this) openFolder = null
+                if (binding.dragLayer.activeFolder === this) {
+                    binding.dragLayer.activeFolder = null
+                    binding.dragLayer.onTouchOutsideFolder = null
+                }
             }
         }
         openFolder = folder
         dragController.addDropTarget(folder)
         folder.open(info, binding.dragLayer)
+
+        // Tapping the home screen around the panel is the obvious way to put it away, and the
+        // drag layer is the only view that sees a tap which lands on neither.
+        if (appState.preferences.closeFolderOnTapOutside) {
+            binding.dragLayer.activeFolder = folder
+            binding.dragLayer.onTouchOutsideFolder = { closeFolder() }
+        }
     }
 
     private fun closeFolder() {
+        // Cleared before the animation rather than in onClosed, so a second tap during the close
+        // does not ask a folder that is already going away to close again.
+        binding.dragLayer.activeFolder = null
+        binding.dragLayer.onTouchOutsideFolder = null
         openFolder?.close()
         openFolder = null
+    }
+
+    /**
+     * A long press on an icon inside an open folder.
+     *
+     * The same two-in-one gesture the workspace uses: hold still for the menu, move to drag the app
+     * out onto the home screen. Folders had neither, which made them a place apps could be put and
+     * not taken out of - the one arrangement in the launcher the user could not undo.
+     */
+    private fun startDragFromFolder(folder: FolderInfo, item: ShortcutInfo, view: View): Boolean {
+        closeIconOptions()
+        dragSourceFolder = folder
+
+        dragController.preparePendingDrag(
+            view = view,
+            source = binding.workspace,
+            info = item,
+            hideOriginal = true,
+            onPromoted = { closeIconOptions() },
+        )
+        showFolderIconOptions(view, folder, item)
+        return true
+    }
+
+    /**
+     * The icon menu for an app inside a folder.
+     *
+     * Two of the workspace actions read wrong in here and are replaced by one that does not: an app
+     * in a folder is not loose on a page, so "put it in a new folder" is meaningless, and "remove
+     * from home screen" is not what someone reaching into a folder is usually after. What they want
+     * is the app back out on the page, which is what [removeFromFolder] does.
+     */
+    private fun showFolderIconOptions(anchor: View, folder: FolderInfo, item: ShortcutInfo) {
+        // Same reasoning as the workspace menu: v0.2.0 had no per-icon menu, so Simple mode has
+        // none either and the press goes straight to dragging the app out.
+        if (appState.preferences.simpleMode) return
+
+        val popup = IconOptionsPopup(this)
+            .addAction(R.string.icon_option_rename) { showRenameDialog(item, anchor) }
+            .addAction(R.string.icon_option_take_out_of_folder) { removeFromFolder(folder, item) }
+            .addAction(
+                R.string.icon_option_icon,
+                enabled = item.intent?.component != null,
+            ) { showIconChooser(item.intent?.component) }
+            .addAction(R.string.icon_option_app_info, enabled = item.intent?.component != null) {
+                showAppInfo(item)
+            }
+            .addAction(R.string.icon_option_remove) {
+                // Out of the folder's contents as well as out of the database, or the folder would
+                // keep showing an app whose row no longer exists.
+                folder.remove(item)
+                onItemRemoved(item)
+            }
+            .addAction(
+                R.string.icon_option_uninstall,
+                enabled = ButtonDropTarget.uninstallablePackage(item) != null,
+            ) { uninstall(item) }
+
+        iconOptions = popup
+        // The menu fills the drag layer and dismisses itself on a tap outside its panel. Leaving
+        // the folder's own outside-tap hook armed underneath it would swallow the tap that was
+        // meant for a menu row, because the drag layer sees it first.
+        val folderHook = binding.dragLayer.activeFolder
+        binding.dragLayer.activeFolder = null
+        popup.showAt(binding.dragLayer, anchor) {
+            iconOptions = null
+            if (openFolder != null) binding.dragLayer.activeFolder = folderHook
+        }
+    }
+
+    /**
+     * Takes [item] out of [folder] and puts it back on the home screen.
+     *
+     * Onto the folder's own page when there is room on it, because the app should reappear where
+     * the user was looking rather than on whichever screen happens to be leftmost. A full home
+     * screen is reported rather than worked around: silently deleting the app, or dropping it three
+     * pages away, are both worse than saying there is no room.
+     */
+    private fun removeFromFolder(folder: FolderInfo, item: ShortcutInfo) {
+        val cell = IntArray(2)
+        val screenId = binding.workspace.findFreeCell(
+            outCell = cell,
+            preferredScreenId = folder.screenId,
+        )
+        if (screenId < 0) {
+            Toast.makeText(this, R.string.folder_no_space, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Removing empties the folder in the model, which is what tells the open panel and the
+        // closed tile to redraw - and, if it was the last app, deletes the folder itself.
+        folder.remove(item)
+        onItemPlaced(
+            info = item,
+            container = Containers.DESKTOP,
+            screenId = screenId,
+            cellX = cell[0],
+            cellY = cell[1],
+            rank = 0,
+        )
+        binding.workspace.snapToPage(binding.workspace.getScreenIndex(screenId))
     }
 
     // ---- all apps --------------------------------------------------------------------------------
@@ -1654,6 +1916,14 @@ class Launcher : Activity(), ItemPlacementHandler {
 
         /** How often to re-check whether a drag has finished before rebinding under it. */
         const val DRAG_SETTLE_POLL_MS = 250L
+
+        /**
+         * How many icons the icon pack is applied to between redraws.
+         *
+         * Small enough that the pack visibly arrives in waves rather than all at the end, large
+         * enough that the launcher is not hopping between threads once per icon.
+         */
+        const val ICON_THEME_BATCH = 12
 
         const val REQUEST_CUSTOM_ICON = 1
         const val REQUEST_PACK_ICON = 2

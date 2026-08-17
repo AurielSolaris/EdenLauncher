@@ -45,6 +45,16 @@ class Folder @JvmOverloads constructor(
     /** Called when an icon inside the folder is tapped. */
     var onItemClick: ((ShortcutInfo) -> Unit)? = null
 
+    /**
+     * Called when an icon inside the folder is held.
+     *
+     * Without this a folder was a one-way door: apps could be dropped in and never taken out
+     * again, because the only gesture that moves or removes an icon anywhere else in the launcher
+     * did nothing here. Returns true when the press was handled, exactly like
+     * [android.view.View.OnLongClickListener].
+     */
+    var onItemLongClick: ((ShortcutInfo, BubbleTextView) -> Boolean)? = null
+
     private val titleView: EditText
     private val content: CellLayout
     private val tmpCell = IntArray(2)
@@ -57,6 +67,11 @@ class Folder @JvmOverloads constructor(
         gravity = Gravity.CENTER_HORIZONTAL
         clipToPadding = false
         isFocusable = true
+        // The panel floats over the workspace with no scrim, so anything it does not consume lands
+        // on whatever icon happens to be behind it: a tap on the folder's own padding used to
+        // launch an app through it. Clickable makes the panel absorb its own touches, which also
+        // draws the line the tap-to-close gesture is measured against.
+        isClickable = true
 
         background = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
@@ -225,6 +240,7 @@ class Folder @JvmOverloads constructor(
             val icon = BubbleTextView(context).apply {
                 applyFrom(item, item.icon)
                 setOnClickListener { onItemClick?.invoke(item) }
+                setOnLongClickListener { onItemLongClick?.invoke(item, this) == true }
             }
             item.rank = index
             content.addItem(icon, -1, CellLayout.LayoutParams(tmpCell[0], tmpCell[1], 1, 1))
